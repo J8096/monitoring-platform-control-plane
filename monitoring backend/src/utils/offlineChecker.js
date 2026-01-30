@@ -14,8 +14,9 @@ const OFFLINE_THRESHOLD_SEC = 60;
  * - Updates agent health
  * - Creates OFFLINE alerts (once)
  * - Resolves OFFLINE alerts on recovery
+ * - Emits live status updates via Socket.IO
  */
-async function runOfflineCheck() {
+async function runOfflineCheck(io) {
   try {
     const now = Date.now();
     const agents = await Agent.find();
@@ -48,11 +49,21 @@ async function runOfflineCheck() {
       agent.healthReasons = health.reasons;
       agent.status = health.status;
 
+      // 🔐 IMPORTANT: token is REQUIRED → never touch it
       await agent.save();
+
+      /* ================= LIVE UPDATE ================= */
+      if (io) {
+        io.to(agent._id.toString()).emit("agent:status", {
+          agentId: agent._id,
+          status: agent.status,
+          healthScore: agent.healthScore,
+          reasons: agent.healthReasons,
+        });
+      }
 
       /* ================= OFFLINE TRANSITION ================= */
       if (prevStatus !== "OFFLINE" && health.status === "OFFLINE") {
-        // Prevent duplicate OFFLINE alerts
         const existing = await Alert.findOne({
           agentId: agent._id,
           type: "OFFLINE",
@@ -61,7 +72,7 @@ async function runOfflineCheck() {
 
         if (!existing) {
           const alert = await Alert.create({
-            agentId: agent._id,            // ✅ FIX
+            agentId: agent._id,
             type: "OFFLINE",
             severity: "P1",
             message: `Agent ${agent.name} went offline`,
@@ -83,7 +94,6 @@ async function runOfflineCheck() {
           alert.resolvedAt = new Date();
           await alert.save();
 
-          // Try auto-resolving incident
           if (alert.incidentId) {
             await tryResolveIncident(alert.incidentId, "system");
           }
@@ -91,7 +101,7 @@ async function runOfflineCheck() {
       }
     }
   } catch (err) {
-    console.error("Offline checker failed:", err);
+    console.error("❌ Offline checker failed:", err.message);
   }
 }
 
