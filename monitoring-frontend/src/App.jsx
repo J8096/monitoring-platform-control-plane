@@ -6,7 +6,7 @@ import {
 } from "react-router-dom";
 
 import Login from "./pages/Login";
-import Signup from "./pages/Signup";
+import Signup from "./pages/signup";
 import SignupSuccess from "./pages/SignupSuccess";
 import RequestAccess from "./pages/RequestAcess";
 
