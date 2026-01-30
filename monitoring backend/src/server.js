@@ -11,11 +11,28 @@ const runOfflineCheck = require("./utils/offlineChecker");
 
 const httpServer = http.createServer(app);
 
+/* ================= ALLOWED ORIGINS ================= */
+
+const ALLOWED_ORIGINS = [
+  "http://localhost:5173",
+  "http://localhost:5174",
+  "https://monitoring-platform-control-plane-u24u-eg30q4sv6.vercel.app",
+];
+
 /* ================= SOCKET.IO ================= */
 
 const io = new Server(httpServer, {
   cors: {
-    origin: "http://localhost:5173",
+    origin: (origin, callback) => {
+      // allow requests with no origin (Postman, server-to-server)
+      if (!origin) return callback(null, true);
+
+      if (ALLOWED_ORIGINS.includes(origin)) {
+        return callback(null, true);
+      }
+
+      return callback(new Error("Not allowed by CORS"));
+    },
     credentials: true,
   },
 });
@@ -26,10 +43,6 @@ const io = new Server(httpServer, {
 io.on("connection", (socket) => {
   console.log("🟢 WS connected:", socket.id);
 
-  /**
-   * Subscribe client to agent metrics
-   * (authorization will be added later)
-   */
   socket.on("subscribe:metrics", (agentId) => {
     if (!agentId) return;
 
@@ -46,19 +59,13 @@ io.on("connection", (socket) => {
 
 const PORT = process.env.PORT || 5000;
 
-/**
- * Bootstraps the server safely
- * - DB first
- * - Background jobs once (nodemon-safe)
- * - HTTP + WS on same server
- */
 async function startServer() {
   try {
     // ✅ CONNECT DATABASE FIRST
     await connectDB();
     console.log("✅ MongoDB connected");
 
-    // ✅ RUN BACKGROUND JOB ONCE
+    // ✅ RUN BACKGROUND JOB ONLY ONCE
     if (!global.__offlineIntervalStarted) {
       global.__offlineIntervalStarted = true;
 

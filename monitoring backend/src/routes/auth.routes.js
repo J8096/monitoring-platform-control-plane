@@ -6,7 +6,6 @@ const auth = require("../middleware/auth");
 
 const router = express.Router();
 
-/* ================= SAFETY CHECK ================= */
 if (!process.env.JWT_SECRET) {
   throw new Error("JWT_SECRET is not defined");
 }
@@ -20,7 +19,6 @@ router.post("/signup", async (req, res) => {
       return res.status(400).json({ message: "Email and password required" });
     }
 
-    // normalize email
     email = email.toLowerCase().trim();
 
     const exists = await User.findOne({ email });
@@ -28,7 +26,6 @@ router.post("/signup", async (req, res) => {
       return res.status(400).json({ message: "User already exists" });
     }
 
-    // password will be hashed by pre-save hook
     await User.create({ email, password });
 
     res.status(201).json({ message: "User created" });
@@ -47,7 +44,6 @@ router.post("/login", async (req, res) => {
       return res.status(400).json({ message: "Email and password required" });
     }
 
-    // normalize email
     email = email.toLowerCase().trim();
 
     const user = await User.findOne({ email });
@@ -68,8 +64,8 @@ router.post("/login", async (req, res) => {
 
     res.cookie("token", token, {
       httpOnly: true,
-      sameSite: "lax",
-      secure: process.env.NODE_ENV === "production",
+      secure: true,
+      sameSite: "none",
     });
 
     res.json({ message: "Logged in" });
@@ -89,7 +85,12 @@ router.get("/me", auth, (req, res) => {
 
 /* ================= LOGOUT ================= */
 router.post("/logout", (req, res) => {
-  res.clearCookie("token");
+  res.clearCookie("token", {
+    httpOnly: true,
+    secure: true,
+    sameSite: "none",
+  });
+
   res.json({ message: "Logged out" });
 });
 
