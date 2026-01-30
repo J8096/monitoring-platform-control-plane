@@ -2,10 +2,11 @@
   "name": "monitoring-backend",
   "version": "1.0.0",
   "main": "server.js",
-  "scripts": {
-    "dev": "nodemon src/server.js",
-    "server": "nodemon src/server.js"
-  },
+ "scripts": {
+  "start": "node src/server.js",
+  "dev": "nodemon src/server.js"
+}
+,
   "keywords": [],
   "author": "",
   "license": "ISC",
