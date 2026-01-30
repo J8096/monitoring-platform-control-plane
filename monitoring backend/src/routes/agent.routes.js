@@ -1,4 +1,5 @@
 const express = require("express");
+const crypto = require("crypto");
 const Agent = require("../models/Agent");
 const Metric = require("../models/metric1");
 const requireAuth = require("../middleware/requireAuth");
@@ -7,7 +8,7 @@ const { checkThreshold } = require("../utils/thresholdChecker");
 const router = express.Router();
 
 /* ============================
-   GET /agents
+   GET /agents (AUTH REQUIRED)
 ============================ */
 router.get("/", requireAuth, async (req, res) => {
   try {
@@ -20,41 +21,75 @@ router.get("/", requireAuth, async (req, res) => {
 });
 
 /* ============================
-   POST /agents/heartbeat
+   POST /agents (CREATE AGENT)
 ============================ */
-router.post("/heartbeat", async (req, res) => {
+router.post("/", requireAuth, async (req, res) => {
   try {
-    const { name, cpu, memory } = req.body;
-
-    if (!name || typeof cpu !== "number" || typeof memory !== "number") {
-      return res.status(400).json({ message: "Invalid payload" });
+    const { name, metadata } = req.body;
+    if (!name) {
+      return res.status(400).json({ message: "Agent name required" });
     }
 
-    /* FIND OR CREATE AGENT */
-    let agent = await Agent.findOne({ name });
+    const token = crypto.randomBytes(32).toString("hex");
 
+    const agent = await Agent.create({
+      name,
+      token,
+      status: "OFFLINE",
+      metadata,
+    });
+
+    res.status(201).json({
+      agentId: agent._id,
+      token, // ⚠️ show once
+    });
+  } catch (err) {
+    console.error("Create agent failed:", err);
+    res.status(500).json({ message: "Failed to create agent" });
+  }
+});
+
+/* ============================
+   POST /agents/:id/heartbeat
+   (NO COOKIE AUTH)
+============================ */
+router.post("/:id/heartbeat", async (req, res) => {
+  try {
+    const token = req.headers.authorization?.replace("Bearer ", "");
+    const { id } = req.params;
+    const { cpu, memory } = req.body;
+
+    if (!token) {
+      return res.status(401).json({ message: "Missing agent token" });
+    }
+
+    if (typeof cpu !== "number" || typeof memory !== "number") {
+      return res.status(400).json({ message: "Invalid metrics" });
+    }
+
+    const agent = await Agent.findOne({ _id: id, token });
     if (!agent) {
-      agent = await Agent.create({
-        name,
-        status: "HEALTHY",
-        lastHeartbeat: new Date(),
-      });
-    } else {
-      agent.lastHeartbeat = new Date();
-      agent.status = "HEALTHY";
-      await agent.save();
+      return res.status(401).json({ message: "Invalid agent credentials" });
     }
 
-    /* SAVE METRIC (✅ FIXED FIELD) */
+    /* UPDATE AGENT */
+    agent.cpu = cpu;
+    agent.memory = memory;
+    agent.status = "HEALTHY";
+    agent.lastHeartbeat = new Date();
+    agent.missedHeartbeats = 0;
+    await agent.save();
+
+    /* SAVE METRIC */
     const metric = await Metric.create({
-      agent: agent._id, // ✅ correct
+      agent: agent._id,
       cpu,
       memory,
     });
 
     /* CPU ALERT */
     await checkThreshold({
-      agent: agent._id, // ✅ consistent
+      agent: agent._id,
       type: "CPU_HIGH",
       value: cpu,
       threshold: 90,
@@ -64,7 +99,7 @@ router.post("/heartbeat", async (req, res) => {
 
     /* MEMORY ALERT */
     await checkThreshold({
-      agent: agent._id, // ✅ consistent
+      agent: agent._id,
       type: "MEMORY_HIGH",
       value: memory,
       threshold: 90,
@@ -72,11 +107,7 @@ router.post("/heartbeat", async (req, res) => {
       message: `Memory usage high (${memory}%)`,
     });
 
-    res.json({
-      message: "Heartbeat processed",
-      agentId: agent._id,
-      metricId: metric._id,
-    });
+    res.json({ ok: true, metricId: metric._id });
   } catch (err) {
     console.error("❌ Heartbeat error:", err);
     res.status(500).json({ message: "Server error" });

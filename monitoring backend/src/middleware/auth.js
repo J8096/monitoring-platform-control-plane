@@ -15,7 +15,7 @@ module.exports = function auth(req, res, next) {
       return res.status(401).json({
         message: "Not authenticated",
       });
-    }
+    } // ✅ MISSING BRACE FIXED HERE
 
     // ✅ Verify token
     const decoded = jwt.verify(token, process.env.JWT_SECRET, {
