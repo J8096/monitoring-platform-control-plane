@@ -2,10 +2,10 @@ const os = require("os");
 const axios = require("axios");
 
 // ================= CONFIG =================
-const AGENT_ID = "507f1f77bcf86cd799439011"; // valid ObjectId
-const AGENT_NAME = "Local-Agent";
-const BACKEND_URL = "http://localhost:5000/agents/heartbeat";
-const INTERVAL = 5000; // 5 seconds
+const AGENT_ID = "507f1f77bcf86cd799439011";
+const BACKEND_URL =
+  "https://monitoring-platform-control-plane-3.onrender.com/agents";
+const INTERVAL = 5000;
 // =========================================
 
 function getCPU() {
@@ -19,30 +19,31 @@ function getMemory() {
 
 async function sendHeartbeat() {
   try {
-    const response = await axios.post(BACKEND_URL, {
-      agentId: AGENT_ID,
-      name: AGENT_NAME,
-      cpu: getCPU(),
-      memory: getMemory(),
-    });
+    const res = await axios.post(
+      `${BACKEND_URL}/${AGENT_ID}/heartbeat`,
+      {
+        cpu: getCPU(),
+        memory: getMemory(),
+        hostname: os.hostname(),
+      },
+      {
+        timeout: 5000,
+      }
+    );
 
-    console.log("✅ Heartbeat sent", response.status);
+    console.log("✅ Heartbeat sent", res.status);
   } catch (err) {
-    // 🔍 SHOW REAL ERROR (CRITICAL)
     if (err.response) {
       console.error(
         "❌ Backend error:",
         err.response.status,
         err.response.data
       );
-    } else if (err.request) {
-      console.error("❌ No response from backend (is server running?)");
     } else {
-      console.error("❌ Axios error:", err.message);
+      console.error("❌ Network error:", err.message);
     }
   }
 }
 
-// Send immediately, then every interval
 sendHeartbeat();
 setInterval(sendHeartbeat, INTERVAL);
