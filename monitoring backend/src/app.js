@@ -1,97 +1,41 @@
 const express = require("express");
-const jwt = require("jsonwebtoken");
-const bcrypt = require("bcryptjs");
-const User = require("../models/User");
-const auth = require("../middleware/auth");
+const cors = require("cors");
+const cookieParser = require("cookie-parser");
 
-const router = express.Router();
+const healthRoutes = require("./routes/health.routes");
+const agentRoutes = require("./routes/agent.routes");
+const metricRoutes = require("./routes/metric.routes");
+const authRoutes = require("./routes/auth.routes");
+const alertRoutes = require("./routes/alert.routes");
+const incidentRoutes = require("./routes/incident.routes");
+const rateLimiter = require("./middleware/rateLimit");
 
-if (!process.env.JWT_SECRET) {
-  throw new Error("JWT_SECRET is not defined");
-}
+const app = express();
 
-/* ================= SIGNUP ================= */
-router.post("/signup", async (req, res) => {
-  try {
-    let { email, password } = req.body;
+/* ================= CORS ================= */
+app.use(
+  cors({
+    origin: [
+      "http://localhost:5173",
+      "http://localhost:5174",
+      "https://monitoring-platform-control-plane-u.vercel.app",
+    ],
+    credentials: true,
+  })
+);
 
-    if (!email || !password) {
-      return res.status(400).json({ message: "Email and password required" });
-    }
+/* ================= MIDDLEWARE ================= */
+app.use(express.json());
+app.use(cookieParser());
+app.use(rateLimiter);
 
-    email = email.toLowerCase().trim();
+/* ================= ROUTES ================= */
+app.use("/health", healthRoutes);
+app.use("/agents", agentRoutes);
+app.use("/metrics", metricRoutes);
+app.use("/auth", authRoutes);
+app.use("/alerts", alertRoutes);
+app.use("/incidents", incidentRoutes);
+app.use("/slo", require("./routes/slo.routes"));
 
-    const exists = await User.findOne({ email });
-    if (exists) {
-      return res.status(400).json({ message: "User already exists" });
-    }
-
-    await User.create({ email, password });
-
-    res.status(201).json({ message: "User created" });
-  } catch (err) {
-    console.error("Signup error:", err);
-    res.status(500).json({ message: "Signup failed" });
-  }
-});
-
-/* ================= LOGIN ================= */
-router.post("/login", async (req, res) => {
-  try {
-    let { email, password } = req.body;
-
-    if (!email || !password) {
-      return res.status(400).json({ message: "Email and password required" });
-    }
-
-    email = email.toLowerCase().trim();
-
-    const user = await User.findOne({ email });
-    if (!user) {
-      return res.status(401).json({ message: "Invalid credentials" });
-    }
-
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) {
-      return res.status(401).json({ message: "Invalid credentials" });
-    }
-
-    const token = jwt.sign(
-      { id: user._id, role: user.role },
-      process.env.JWT_SECRET,
-      { expiresIn: "1d" }
-    );
-
-    res.cookie("token", token, {
-      httpOnly: true,
-      secure: true,
-      sameSite: "none",
-    });
-
-    res.json({ message: "Logged in" });
-  } catch (err) {
-    console.error("Login error:", err);
-    res.status(500).json({ message: "Login failed" });
-  }
-});
-
-/* ================= CURRENT USER ================= */
-router.get("/me", auth, (req, res) => {
-  res.json({
-    id: req.user.id,
-    role: req.user.role,
-  });
-});
-
-/* ================= LOGOUT ================= */
-router.post("/logout", (req, res) => {
-  res.clearCookie("token", {
-    httpOnly: true,
-    secure: true,
-    sameSite: "none",
-  });
-
-  res.json({ message: "Logged out" });
-});
-
-module.exports = router;
+module.exports = app;

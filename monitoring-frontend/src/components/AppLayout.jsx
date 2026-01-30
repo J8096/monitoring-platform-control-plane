@@ -5,17 +5,14 @@ import api from "../api/api";
 import Header from "./Header";
 import Sidebar from "./sidebar";
 
-
-
-
 /**
  * APP LAYOUT — POLISHED ENTERPRISE CONTROL PLANE
  *
  * ✔ Clean authentication shell
  * ✔ Global agent state management
- * ✔ Professional layout structure
- * ✔ Navigation and logout
- * ✔ Context provider for pages
+ * ✔ Sidebar agent selection
+ * ✔ Central data source for pages
+ * ✔ Safe polling & cleanup
  */
 
 export default function AppLayout() {
@@ -38,11 +35,11 @@ export default function AppLayout() {
       try {
         const res = await api.get("/auth/me");
         if (!alive) return;
-        setUser(res.data || null);
+        setUser(res.data ?? null);
       } catch {
-        alive && setUser(null);
+        if (alive) setUser(null);
       } finally {
-        alive && setLoadingUser(false);
+        if (alive) setLoadingUser(false);
       }
     }
 
@@ -53,37 +50,36 @@ export default function AppLayout() {
   }, []);
 
   /* ================= LOAD AGENTS ================= */
+  const loadAgents = useCallback(async () => {
+    try {
+      const res = await api.get("/agents");
+      const data = res.data ?? [];
+
+      setAgents(data);
+
+      // Keep active agent stable if possible
+      setActiveAgent((prev) => {
+        if (!prev) return data[0] ?? null;
+        return data.find((a) => a._id === prev._id) ?? data[0] ?? null;
+      });
+    } catch {
+      // silent by design (network hiccups allowed)
+    } finally {
+      setAgentsLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     let alive = true;
 
-    async function loadAgents() {
-      try {
-        const res = await api.get("/agents");
-        if (!alive) return;
-
-        const data = res.data || [];
-        setAgents(data);
-
-        setActiveAgent((prev) =>
-          prev
-            ? data.find((a) => a._id === prev._id) ?? data[0] ?? null
-            : data[0] ?? null
-        );
-      } catch {
-        // silent by design
-      } finally {
-        alive && setAgentsLoading(false);
-      }
-    }
-
-    loadAgents();
-    const id = setInterval(loadAgents, 5000);
+    if (alive) loadAgents();
+    const interval = setInterval(loadAgents, 5000);
 
     return () => {
       alive = false;
-      clearInterval(id);
+      clearInterval(interval);
     };
-  }, []);
+  }, [loadAgents]);
 
   /* ================= LOGOUT ================= */
   const handleLogout = useCallback(async () => {
@@ -98,7 +94,11 @@ export default function AppLayout() {
   return (
     <div className="h-screen bg-slate-950 text-slate-100 flex flex-col overflow-hidden">
       {/* ================= HEADER ================= */}
-      <Header user={user} loading={loadingUser} onLogout={handleLogout} />
+      <Header
+        user={user}
+        loading={loadingUser}
+        onLogout={handleLogout}
+      />
 
       {/* ================= BODY ================= */}
       <div className="flex flex-1 overflow-hidden">
@@ -112,7 +112,14 @@ export default function AppLayout() {
 
         {/* ================= MAIN CONTENT ================= */}
         <main className="flex-1 overflow-hidden bg-slate-950">
-          <Outlet context={{ agents, activeAgent, user }} />
+          <Outlet
+            context={{
+              user,
+              agents,
+              activeAgent,
+              reloadAgents: loadAgents, // 🔥 allows CreateAgentModal to refresh list
+            }}
+          />
         </main>
       </div>
     </div>

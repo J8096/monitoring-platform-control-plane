@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const crypto = require("crypto");
 
 const agentSchema = new mongoose.Schema(
   {
@@ -6,21 +7,23 @@ const agentSchema = new mongoose.Schema(
     name: {
       type: String,
       required: true,
+      trim: true,
     },
 
-    // 🔐 REQUIRED for agent authentication
+    // 🔐 Agent authentication token (AUTO GENERATED)
     token: {
       type: String,
       required: true,
       unique: true,
       index: true,
+      default: () => crypto.randomBytes(32).toString("hex"),
     },
 
     /* ================= STATUS ================= */
     status: {
       type: String,
       enum: ["HEALTHY", "DEGRADED", "UNHEALTHY", "OFFLINE"],
-      default: "OFFLINE", // ⬅️ IMPORTANT
+      default: "OFFLINE",
     },
 
     lastHeartbeat: Date,
@@ -69,7 +72,7 @@ const agentSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// Prevent overwrite error (hot reload safe)
+/* ================= SAFETY ================= */
+// Prevent model overwrite in dev / nodemon
 module.exports =
-  mongoose.models.Agent ||
-  mongoose.model("Agent", agentSchema);
+  mongoose.models.Agent || mongoose.model("Agent", agentSchema);

@@ -15,14 +15,14 @@ module.exports = function auth(req, res, next) {
       return res.status(401).json({
         message: "Not authenticated",
       });
-    } // ✅ MISSING BRACE FIXED HERE
+    }
 
     // ✅ Verify token
     const decoded = jwt.verify(token, process.env.JWT_SECRET, {
       algorithms: ["HS256"],
     });
 
-    // ✅ Attach only minimal, trusted fields
+    // ✅ Attach minimal trusted fields
     req.user = {
       id: decoded.id,
       role: decoded.role || "user",
@@ -30,9 +30,7 @@ module.exports = function auth(req, res, next) {
 
     next();
   } catch (err) {
-    // 🔐 Token expired or invalid
     console.error("❌ Auth failed:", err.message);
-
     return res.status(401).json({
       message: "Session expired or invalid token",
     });

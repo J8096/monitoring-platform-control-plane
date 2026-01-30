@@ -18,6 +18,8 @@ import SLO from "./pages/SLO";
 import AppLayout from "./components/AppLayout";
 import Protected from "./components/protected";
 
+import Agents from "./pages/Agents";
+
 /* ================= ROUTES ================= */
 
 function AppRoutes() {
@@ -28,6 +30,7 @@ function AppRoutes() {
       <Route path="/signup" element={<Signup />} />
       <Route path="/signup-success" element={<SignupSuccess />} />
       <Route path="/request-access" element={<RequestAccess />} />
+
 
       {/* ================= PROTECTED ================= */}
       <Route
@@ -40,6 +43,8 @@ function AppRoutes() {
       >
         {/* DASHBOARD HOME */}
         <Route index element={<Dashboard />} />
+        <Route path="agents" element={<Agents />} />
+
 
         {/* OTHER PAGES */}
         <Route path="incidents" element={<Incidents />} />

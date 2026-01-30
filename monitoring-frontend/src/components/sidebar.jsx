@@ -72,6 +72,11 @@ export default function Sidebar({
             <AlertTriangle className="w-4 h-4" />
             <span>Incidents</span>
           </NavLink>
+          <NavLink to="/agents" className={navClass}>
+  <Server className="w-4 h-4" />
+  <span>Agents</span>
+</NavLink>
+
         </nav>
       </div>
 
