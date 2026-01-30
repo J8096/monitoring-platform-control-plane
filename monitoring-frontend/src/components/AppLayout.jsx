@@ -3,7 +3,9 @@ import { Outlet, useNavigate } from "react-router-dom";
 import api from "../api/api";
 
 import Header from "./Header";
-import Sidebar from "./Sidebar";
+import Sidebar from "./sidebar";
+
+
 
 
 /**
