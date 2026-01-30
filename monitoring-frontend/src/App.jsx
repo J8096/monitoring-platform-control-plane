@@ -16,7 +16,7 @@ import IncidentDetails from "./pages/IncidentDetails";
 import SLO from "./pages/SLO";
 
 import AppLayout from "./components/AppLayout";
-import Protected from "./components/Protected";
+import Protected from "./components/protected";
 
 /* ================= ROUTES ================= */
 
