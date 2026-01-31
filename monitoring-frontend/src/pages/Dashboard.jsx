@@ -67,32 +67,26 @@ export default function Dashboard() {
     };
   }, [isVisible]);
 
-  /* ================= ALERTS ================= */
+  /* ================= ALERTS (FIXED) ================= */
+  const loadAlerts = async () => {
+    try {
+      const res = await api.get("/alerts?limit=50");
+      setAlerts(res.data?.data || []);
+    } finally {
+      setAlertsLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (!isVisible) return;
-
-    let alive = true;
-
-    async function loadAlerts() {
-      try {
-        const res = await api.get("/alerts?limit=50");
-        if (!alive) return;
-        setAlerts(res.data?.data || []);
-      } finally {
-        alive && setAlertsLoading(false);
-      }
-    }
 
     loadAlerts();
     const id = setInterval(loadAlerts, 5000);
 
-    return () => {
-      alive = false;
-      clearInterval(id);
-    };
+    return () => clearInterval(id);
   }, [isVisible]);
 
-  /* ================= METRICS (INITIAL FETCH) ================= */
+  /* ================= METRICS ================= */
   useEffect(() => {
     if (!activeAgent || !isVisible) return;
 
@@ -117,58 +111,23 @@ export default function Dashboard() {
     loadMetrics();
   }, [activeAgent, timeRange, isVisible]);
 
-  /* ================= SOCKET CONNECT (ONCE) ================= */
+  /* ================= SOCKET ================= */
   useEffect(() => {
-    if (!socket.connected) {
-      socket.connect();
-    }
+    if (!socket.connected) socket.connect();
 
     socket.on("metrics:update", (metric) => {
       setMetrics((prev) => [...prev.slice(-299), metric]);
     });
 
-    return () => {
-      socket.off("metrics:update");
-    };
+    return () => socket.off("metrics:update");
   }, []);
 
-  /* ================= METRICS SUBSCRIPTION ================= */
   useEffect(() => {
     if (!activeAgent || !socket.connected) return;
 
     socket.emit("subscribe:metrics", activeAgent._id);
-
-    return () => {
-      socket.emit("unsubscribe:metrics", activeAgent._id);
-    };
+    return () => socket.emit("unsubscribe:metrics", activeAgent._id);
   }, [activeAgent]);
-
-  /* ================= HEARTBEAT ================= */
-  const heartbeat = useMemo(() => {
-    if (!activeAgent) return null;
-
-    const age = activeAgent.heartbeatAgeSec ?? 0;
-    const missed = activeAgent.missedHeartbeats ?? 0;
-
-    let status = "HEALTHY";
-    if (age > 15 || missed > 3) status = "DEGRADED";
-    if (age > 60) status = "OFFLINE";
-
-    return { status, age, missed };
-  }, [activeAgent]);
-
-  /* ================= METRIC DELTA ================= */
-  const metricDelta = useMemo(() => {
-    if (metrics.length < 2) return null;
-
-    const last = metrics.at(-1);
-    const prev = metrics.at(-2);
-
-    return {
-      cpu: Math.round((last.cpu ?? 0) - (prev.cpu ?? 0)),
-      memory: Math.round((last.memory ?? 0) - (prev.memory ?? 0)),
-    };
-  }, [metrics]);
 
   /* ================= ALERT MARKERS ================= */
   const alertMarkers = useMemo(() => {
@@ -210,7 +169,10 @@ export default function Dashboard() {
               {alertsLoading ? (
                 <p className="text-slate-400">Loading alerts…</p>
               ) : (
-                <AlertTable alerts={alerts} />
+                <AlertTable
+                  alerts={alerts}
+                  reloadAlerts={loadAlerts}
+                />
               )}
             </div>
           </>

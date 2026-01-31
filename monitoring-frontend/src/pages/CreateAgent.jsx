@@ -1,12 +1,25 @@
 import { useState } from "react";
-import api from "../../api/api";
+import { useNavigate } from "react-router-dom";
+import api from "../api/api";
 
 export default function CreateAgentModal({ onClose }) {
+  const navigate = useNavigate();
+
   const [name, setName] = useState("");
   const [loading, setLoading] = useState(false);
   const [agent, setAgent] = useState(null);
   const [error, setError] = useState("");
 
+  /* ================= CLOSE HANDLER ================= */
+  const handleClose = () => {
+    if (onClose) {
+      onClose(); // modal usage
+    } else {
+      navigate("/agents", { replace: true }); // route usage
+    }
+  };
+
+  /* ================= CREATE ================= */
   async function handleCreate(e) {
     e.preventDefault();
     if (!name.trim()) return;
@@ -27,12 +40,12 @@ export default function CreateAgentModal({ onClose }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
       <div className="w-full max-w-md rounded-xl bg-slate-900 border border-slate-800 shadow-xl p-6">
-        {/* ===== Header ===== */}
+        {/* ================= HEADER ================= */}
         <h2 className="text-lg font-semibold text-white mb-4">
           Create Agent
         </h2>
 
-        {/* ===== FORM ===== */}
+        {/* ================= FORM ================= */}
         {!agent && (
           <form onSubmit={handleCreate} className="space-y-4">
             <input
@@ -49,11 +62,11 @@ export default function CreateAgentModal({ onClose }) {
               </div>
             )}
 
-            {/* ===== Actions ===== */}
+            {/* ================= ACTIONS ================= */}
             <div className="flex justify-end gap-3 pt-2">
               <button
                 type="button"
-                onClick={onClose}
+                onClick={handleClose}
                 className="px-4 py-2 text-sm rounded-md border border-slate-700 text-slate-300 hover:bg-slate-800"
               >
                 Cancel
@@ -70,7 +83,7 @@ export default function CreateAgentModal({ onClose }) {
           </form>
         )}
 
-        {/* ===== SUCCESS ===== */}
+        {/* ================= SUCCESS ================= */}
         {agent && (
           <div className="space-y-4">
             <div className="text-emerald-400 font-medium">
@@ -89,16 +102,15 @@ export default function CreateAgentModal({ onClose }) {
               Save this token now. You won’t see it again.
             </p>
 
-         {/* ===== Footer ===== */}
-<div className="flex justify-end pt-2 pr-4">
-  <button
-    onClick={onClose}
-    className="px-4 py-2 text-sm rounded-md bg-slate-800 hover:bg-slate-700 text-white"
-  >
-    Close
-  </button>
-</div>
-
+            {/* ================= FOOTER ================= */}
+            <div className="flex justify-end pt-2 pr-4">
+              <button
+                onClick={handleClose}
+                className="px-4 py-2 text-sm rounded-md bg-slate-800 hover:bg-slate-700 text-white"
+              >
+                Close
+              </button>
+            </div>
           </div>
         )}
       </div>
@@ -106,7 +118,7 @@ export default function CreateAgentModal({ onClose }) {
   );
 }
 
-/* ===== Helper ===== */
+/* ================= HELPER ================= */
 
 function Field({ label, children, danger = false }) {
   return (

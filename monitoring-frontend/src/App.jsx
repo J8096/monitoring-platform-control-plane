@@ -32,22 +32,21 @@ function AppRoutes() {
       <Route path="/signup-success" element={<SignupSuccess />} />
       <Route path="/request-access" element={<RequestAccess />} />
 
-
       {/* ================= PROTECTED ================= */}
       <Route
         path="/"
         element={
           <Protected>
             <AppLayout />
-            <Route path="agents/create" element={<CreateAgent />} />
-
           </Protected>
         }
       >
         {/* DASHBOARD HOME */}
         <Route index element={<Dashboard />} />
-        <Route path="agents" element={<Agents />} />
 
+        {/* AGENTS */}
+        <Route path="agents" element={<Agents />} />
+        <Route path="agents/create" element={<CreateAgent />} />
 
         {/* OTHER PAGES */}
         <Route path="incidents" element={<Incidents />} />
@@ -60,6 +59,7 @@ function AppRoutes() {
     </Routes>
   );
 }
+
 
 /* ================= APP ROOT ================= */
 
