@@ -76,6 +76,11 @@ export default function Sidebar({
   <Server className="w-4 h-4" />
   <span>Agents</span>
 </NavLink>
+<NavLink to="/agents/create" className={navClass}>
+  <Server className="w-4 h-4" />
+  <span>Create Agent</span>
+</NavLink>
+
 
         </nav>
       </div>

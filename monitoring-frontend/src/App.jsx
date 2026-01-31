@@ -9,6 +9,7 @@ import Login from "./pages/Login";
 import Signup from "./pages/signup";
 import SignupSuccess from "./pages/SignupSuccess";
 import RequestAccess from "./pages/RequestAcess";
+import CreateAgent from "./pages/CreateAgent";
 
 import Dashboard from "./pages/Dashboard";
 import Incidents from "./pages/Incidents";
@@ -38,6 +39,8 @@ function AppRoutes() {
         element={
           <Protected>
             <AppLayout />
+            <Route path="agents/create" element={<CreateAgent />} />
+
           </Protected>
         }
       >
