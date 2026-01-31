@@ -4,10 +4,21 @@
 // ========================================
 
 import { io } from "socket.io-client";
-import { shouldUseMockData, generateRealtimeMockMetric } from '../services/mockData';
+import { shouldUseMockData, generateRealtimeMockMetric } from "../services/mockData";
 
 const USE_MOCK = shouldUseMockData();
-const WS_URL = import.meta.env.VITE_WS_URL || "http://localhost:5000";
+
+/**
+ * ✅ Correct WebSocket URL resolution
+ * Priority:
+ * 1. VITE_WS_URL (explicit)
+ * 2. VITE_API_URL (backend base)
+ * 3. window.location.origin (same host)
+ */
+const WS_URL =
+  import.meta.env.VITE_WS_URL ||
+  import.meta.env.VITE_API_URL ||
+  window.location.origin;
 
 // ========================================
 // MOCK SOCKET IMPLEMENTATION
@@ -17,44 +28,40 @@ class MockSocket {
   constructor() {
     this.connected = false;
     this.handlers = {};
-    this.subscriptions = new Map(); // agentId -> interval
-    this.metricsCache = new Map(); // agentId -> metrics array
+    this.subscriptions = new Map();
+    this.metricsCache = new Map();
   }
 
   connect() {
-    console.log('🔌 Mock WebSocket connecting...');
+    console.log("🔌 Mock WebSocket connecting...");
     setTimeout(() => {
       this.connected = true;
-      console.log('✅ Mock WebSocket connected');
-      this._trigger('connect');
+      console.log("✅ Mock WebSocket connected");
+      this._trigger("connect");
     }, 100);
     return this;
   }
 
   disconnect() {
-    console.log('📴 Mock WebSocket disconnecting...');
+    console.log("📴 Mock WebSocket disconnecting...");
     this.connected = false;
-    
-    // Clear all subscriptions
+
     for (const interval of this.subscriptions.values()) {
       clearInterval(interval);
     }
     this.subscriptions.clear();
     this.metricsCache.clear();
-    
-    this._trigger('disconnect');
+
+    this._trigger("disconnect");
   }
 
   on(event, handler) {
-    if (!this.handlers[event]) {
-      this.handlers[event] = [];
-    }
+    if (!this.handlers[event]) this.handlers[event] = [];
     this.handlers[event].push(handler);
   }
 
   off(event, handler) {
     if (!this.handlers[event]) return;
-    
     if (handler) {
       this.handlers[event] = this.handlers[event].filter(h => h !== handler);
     } else {
@@ -63,73 +70,35 @@ class MockSocket {
   }
 
   emit(event, data) {
-    if (event === 'subscribe:metrics') {
-      this._handleSubscribe(data);
-    } else if (event === 'unsubscribe:metrics') {
-      this._handleUnsubscribe(data);
-    }
+    if (event === "subscribe:metrics") this._handleSubscribe(data);
+    if (event === "unsubscribe:metrics") this._handleUnsubscribe(data);
   }
 
   _trigger(event, data) {
-    const handlers = this.handlers[event] || [];
-    handlers.forEach(handler => {
-      try {
-        handler(data);
-      } catch (err) {
-        console.error('Mock socket handler error:', err);
-      }
-    });
+    (this.handlers[event] || []).forEach(h => h(data));
   }
 
   _handleSubscribe(agentId) {
     if (!agentId || this.subscriptions.has(agentId)) return;
 
-    console.log('📡 Mock subscribe to agent:', agentId);
-
-    // Initialize metrics cache for this agent
     if (!this.metricsCache.has(agentId)) {
       this.metricsCache.set(agentId, []);
     }
 
-    // Send metrics every 5 seconds
     const interval = setInterval(() => {
-      const previousMetrics = this.metricsCache.get(agentId) || [];
-      const newMetric = generateRealtimeMockMetric(agentId, previousMetrics);
-      
-      // Update cache (keep last 10 metrics for smoother transitions)
-      const cache = [...previousMetrics, newMetric].slice(-10);
-      this.metricsCache.set(agentId, cache);
+      const prev = this.metricsCache.get(agentId) || [];
+      const metric = generateRealtimeMockMetric(agentId, prev);
+      this.metricsCache.set(agentId, [...prev, metric].slice(-10));
 
-      // Emit the metric
-      this._trigger('metrics:update', {
-        agentId: newMetric.agentId,
-        cpu: newMetric.cpu,
-        memory: newMetric.memory,
-        timestamp: newMetric.timestamp
-      });
+      this._trigger("metrics:update", metric);
     }, 5000);
 
     this.subscriptions.set(agentId, interval);
-
-    // Send initial metric immediately
-    const initialMetric = generateRealtimeMockMetric(agentId, []);
-    this.metricsCache.set(agentId, [initialMetric]);
-    setTimeout(() => {
-      this._trigger('metrics:update', {
-        agentId: initialMetric.agentId,
-        cpu: initialMetric.cpu,
-        memory: initialMetric.memory,
-        timestamp: initialMetric.timestamp
-      });
-    }, 500);
   }
 
   _handleUnsubscribe(agentId) {
-    if (!agentId || !this.subscriptions.has(agentId)) return;
-
-    console.log('📴 Mock unsubscribe from agent:', agentId);
-
     const interval = this.subscriptions.get(agentId);
+    if (!interval) return;
     clearInterval(interval);
     this.subscriptions.delete(agentId);
     this.metricsCache.delete(agentId);
@@ -140,35 +109,25 @@ class MockSocket {
 // CREATE SOCKET (MOCK OR REAL)
 // ========================================
 
-export const socket = USE_MOCK 
+export const socket = USE_MOCK
   ? new MockSocket()
   : io(WS_URL, {
       withCredentials: true,
       transports: ["websocket"],
       autoConnect: false,
       reconnection: true,
-      reconnectionAttempts: 10,
-      reconnectionDelay: 1000,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1500,
     });
 
-// Log socket mode
-if (USE_MOCK) {
-  console.log('🔧 Using MOCK WebSocket');
-} else {
-  console.log('🔌 Using REAL WebSocket:', WS_URL);
-  
-  // Real socket event logging
-  socket.on('connect', () => {
-    console.log('✅ Real WebSocket connected');
-  });
+// ========================================
+// LOGGING
+// ========================================
 
-  socket.on('disconnect', () => {
-    console.log('❌ Real WebSocket disconnected');
-  });
-
-  socket.on('error', (error) => {
-    console.error('❌ Real WebSocket error:', error);
-  });
-}
+console.log(
+  USE_MOCK
+    ? "🔧 Using MOCK WebSocket"
+    : `🔌 Using REAL WebSocket → ${WS_URL}`
+);
 
 export default socket;
