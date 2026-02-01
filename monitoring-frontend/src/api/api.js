@@ -17,8 +17,14 @@ const USE_MOCK = shouldUseMockData();
 console.log('🔧 API Mode:', USE_MOCK ? 'MOCK DATA' : 'REAL BACKEND');
 
 // Create axios instance (same as your original api.js)
+const API_BASE = import.meta.env.VITE_API_URL;
+
+if (!USE_MOCK && !API_BASE) {
+  console.error("❌ VITE_API_URL is missing in production");
+}
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL,
+  baseURL: API_BASE,
   withCredentials: true,
   timeout: 15000,
   headers: {
@@ -32,11 +38,13 @@ api.interceptors.response.use(
   (error) => {
     if (error.response) {
       const { status } = error.response;
-      if (status === 401) {
-        if (!window.location.pathname.startsWith("/login")) {
-          window.location.href = "/login";
-        }
-      }
+
+   if (status === 401 && !USE_MOCK) {
+  if (!window.location.pathname.startsWith("/login")) {
+    window.location.href = "/login";
+  }
+}
+
       return Promise.reject(error);
     }
     error.isNetworkError = true;
@@ -56,12 +64,12 @@ const mockAPI = {
     await mockDelay();
     return { data: MOCK_USER };
   },
+async post_auth_login(data) {
+  await mockDelay();
+  console.log('🔐 Mock login:', data.email);
+  return { data: MOCK_USER };
+}
 
-  async post_auth_login(data) {
-    await mockDelay();
-    console.log('🔐 Mock login:', data.email);
-    return { data: { message: "Logged in" } };
-  },
 
   async post_auth_logout() {
     await mockDelay();
