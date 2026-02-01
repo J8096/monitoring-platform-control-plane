@@ -7,14 +7,6 @@ import { socket } from "../api/socket";
 import AlertTable from "../components/AlertTable";
 import MetricChart from "../components/MetricChart";
 
-/* ================= HELPERS ================= */
-
-function formatDelta(value) {
-  if (value > 0) return `↑ ${value}`;
-  if (value < 0) return `↓ ${Math.abs(value)}`;
-  return "—";
-}
-
 /* ================= DASHBOARD ================= */
 
 export default function Dashboard() {
@@ -50,12 +42,14 @@ export default function Dashboard() {
         const data = res.data || [];
         setAgents(data);
 
-        setActiveAgent((prev) =>
+        setActiveAgent(prev =>
           prev
-            ? data.find((a) => a._id === prev._id) ?? data[0] ?? null
+            ? data.find(a => a._id === prev._id) ?? data[0] ?? null
             : data[0] ?? null
         );
-      } catch {}
+      } catch (err) {
+        console.error("Failed to load agents", err);
+      }
     }
 
     loadAgents();
@@ -67,11 +61,13 @@ export default function Dashboard() {
     };
   }, [isVisible]);
 
-  /* ================= ALERTS (FIXED) ================= */
+  /* ================= ALERTS ================= */
   const loadAlerts = async () => {
     try {
       const res = await api.get("/alerts?limit=50");
       setAlerts(res.data?.data || []);
+    } catch (err) {
+      console.error("Failed to load alerts", err);
     } finally {
       setAlertsLoading(false);
     }
@@ -82,26 +78,30 @@ export default function Dashboard() {
 
     loadAlerts();
     const id = setInterval(loadAlerts, 5000);
-
     return () => clearInterval(id);
   }, [isVisible]);
 
-  /* ================= METRICS ================= */
+  /* ================= METRICS (FETCH) ================= */
   useEffect(() => {
     if (!activeAgent || !isVisible) return;
 
     const agentId = activeAgent._id;
     activeAgentIdRef.current = agentId;
+
+    // 🔑 IMPORTANT: reset metrics on agent change
+    setMetrics([]);
     setMetricsLoading(true);
 
     async function loadMetrics() {
       try {
         const res = await api.get(`/metrics/${agentId}?range=${timeRange}`);
+
         if (activeAgentIdRef.current === agentId) {
-          setMetrics(res.data || []);
+          setMetrics(Array.isArray(res.data) ? res.data : []);
           setMetricsError(null);
         }
-      } catch {
+      } catch (err) {
+        console.error("Metrics error", err);
         setMetricsError("Metrics unavailable");
       } finally {
         setMetricsLoading(false);
@@ -111,15 +111,19 @@ export default function Dashboard() {
     loadMetrics();
   }, [activeAgent, timeRange, isVisible]);
 
-  /* ================= SOCKET ================= */
+  /* ================= SOCKET (REAL-TIME) ================= */
   useEffect(() => {
     if (!socket.connected) socket.connect();
 
-    socket.on("metrics:update", (metric) => {
-      setMetrics((prev) => [...prev.slice(-299), metric]);
-    });
+    const onMetricUpdate = metric => {
+      // 🔒 Ignore metrics from other agents
+      if (metric.agentId !== activeAgentIdRef.current) return;
 
-    return () => socket.off("metrics:update");
+      setMetrics(prev => [...prev.slice(-299), metric]);
+    };
+
+    socket.on("metrics:update", onMetricUpdate);
+    return () => socket.off("metrics:update", onMetricUpdate);
   }, []);
 
   useEffect(() => {
@@ -132,7 +136,7 @@ export default function Dashboard() {
   /* ================= ALERT MARKERS ================= */
   const alertMarkers = useMemo(() => {
     if (!activeAgent) return [];
-    return alerts.filter((a) => a.agentId === activeAgent._id);
+    return alerts.filter(a => a.agentId === activeAgent._id);
   }, [alerts, activeAgent]);
 
   /* ================= UI ================= */
@@ -148,7 +152,7 @@ export default function Dashboard() {
                 </h2>
 
                 <div className="flex gap-1 bg-slate-900/50 rounded-lg p-1 border border-slate-800/50">
-                  {["5m", "1h", "24h"].map((r) => (
+                  {["5m", "1h", "24h"].map(r => (
                     <button
                       key={r}
                       onClick={() => setTimeRange(r)}
@@ -169,10 +173,7 @@ export default function Dashboard() {
               {alertsLoading ? (
                 <p className="text-slate-400">Loading alerts…</p>
               ) : (
-                <AlertTable
-                  alerts={alerts}
-                  reloadAlerts={loadAlerts}
-                />
+                <AlertTable alerts={alerts} reloadAlerts={loadAlerts} />
               )}
             </div>
           </>
