@@ -1,12 +1,18 @@
 import axios from "axios";
 
-/* ================= AXIOS INSTANCE ================= */
+/* ================= BASE URL ================= */
 
 const API_BASE =
   import.meta.env.VITE_API_URL ||
   "https://monitoring-platform-control-plane-3.onrender.com/api";
 
-console.log("API BASE:", API_BASE);
+if (!API_BASE) {
+  console.error("❌ API base URL is not defined.");
+} else {
+  console.log("🚀 API BASE:", API_BASE);
+}
+
+/* ================= AXIOS INSTANCE ================= */
 
 const api = axios.create({
   baseURL: API_BASE,
@@ -14,51 +20,81 @@ const api = axios.create({
   headers: {
     "Content-Type": "application/json",
   },
-  timeout: 15000,
+  timeout: 20000, // increased slightly for Render cold start
 });
+
+/* ================= RESPONSE INTERCEPTOR ================= */
+
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    // Timeout handling
+    if (error.code === "ECONNABORTED") {
+      console.error("⏳ Request timed out.");
+    }
+
+    // Auth expired handling
+    if (error.response?.status === 401) {
+      if (!window.location.pathname.startsWith("/login")) {
+        window.location.href = "/login";
+      }
+    }
+
+    return Promise.reject(error);
+  }
+);
 
 /* ================= API CLIENT ================= */
 
 const apiClient = {
-  // AUTH
+  /* ---------- AUTH ---------- */
   async login(data) {
-    return (await api.post("/auth/login", data)).data;
+    const res = await api.post("/auth/login", data);
+    return res.data;
   },
 
   async logout() {
-    return (await api.post("/auth/logout")).data;
+    const res = await api.post("/auth/logout");
+    return res.data;
   },
 
   async me() {
-    return (await api.get("/auth/me")).data;
+    const res = await api.get("/auth/me");
+    return res.data;
   },
 
-  // AGENTS
+  /* ---------- AGENTS ---------- */
   async get_agents() {
-    return (await api.get("/agents")).data;
+    const res = await api.get("/agents");
+    return res.data;
   },
 
   async post_agents(data) {
-    return (await api.post("/agents", data)).data;
+    const res = await api.post("/agents", data);
+    return res.data;
   },
 
   async get_agent(id) {
-    return (await api.get(`/agents/${id}`)).data;
+    const res = await api.get(`/agents/${id}`);
+    return res.data;
   },
 
-  // METRICS
+  /* ---------- METRICS ---------- */
   async get_metrics(agentId) {
-    return (await api.get(`/metrics/${agentId}`)).data;
+    const res = await api.get(`/metrics/${agentId}`);
+    return res.data;
   },
 
-  // INCIDENTS
+  /* ---------- INCIDENTS ---------- */
   async get_incidents() {
-    return (await api.get("/incidents")).data;
+    const res = await api.get("/incidents");
+    return res.data;
   },
 
-  // ALERTS
+  /* ---------- ALERTS ---------- */
   async get_alerts() {
-    return (await api.get("/alerts")).data;
+    const res = await api.get("/alerts");
+    return res.data;
   },
 };
 
