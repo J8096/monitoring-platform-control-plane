@@ -1,297 +1,269 @@
 import axios from "axios";
 import {
   MOCK_AGENTS,
-  MOCK_ALERTS,
-  MOCK_INCIDENTS,
   MOCK_USER,
+  getMockAlerts,
+  acknowledgeMockAlert,
+  resolveMockAlert,
+  getMockIncidents,
+  resolveMockIncident,
+  acknowledgeMockIncident,
   generateMockMetrics,
   generateMockSLOData,
   shouldUseMockData,
 } from "../services/mockData";
 
-// ========================================
-// MODE SELECTION
-// ========================================
-const USE_MOCK = shouldUseMockData();
+/* ========================================
+   MODE SELECTION
+======================================== */
 
+const USE_MOCK = shouldUseMockData();
 console.log("🔧 API Mode:", USE_MOCK ? "MOCK DATA" : "REAL BACKEND");
 
-// ========================================
-// AXIOS INSTANCE
-// ========================================
+/* ========================================
+   REAL BACKEND AXIOS INSTANCE
+======================================== */
+
 const API_BASE = import.meta.env.VITE_API_URL;
 
-if (!USE_MOCK && !API_BASE) {
-  console.error("❌ VITE_API_URL is missing in production");
-}
-
-const api = axios.create({
+const axiosInstance = axios.create({
   baseURL: API_BASE,
   withCredentials: true,
   timeout: 15000,
-  headers: {
-    "Content-Type": "application/json",
-  },
+  headers: { "Content-Type": "application/json" },
 });
 
-// ========================================
-// RESPONSE INTERCEPTOR
-// ========================================
-api.interceptors.response.use(
+axiosInstance.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response) {
-      const { status } = error.response;
-
-      if (status === 401 && !USE_MOCK) {
-        if (!window.location.pathname.startsWith("/login")) {
-          window.location.href = "/login";
-        }
+    if (error.response?.status === 401 && !USE_MOCK) {
+      if (!window.location.pathname.startsWith("/login")) {
+        window.location.href = "/login";
       }
-    } else {
-      error.isNetworkError = true;
     }
-
     return Promise.reject(error);
   }
 );
 
-// ========================================
-// MOCK HELPERS
-// ========================================
-const mockDelay = () => new Promise((resolve) => setTimeout(resolve, 300));
+/* ========================================
+   MOCK UTIL
+======================================== */
 
-// ========================================
-// MOCK API IMPLEMENTATION
-// ========================================
+const mockDelay = () =>
+  new Promise((resolve) => setTimeout(resolve, 300));
+
+/* ========================================
+   MOCK IMPLEMENTATION
+======================================== */
+
 const mockAPI = {
-  // ---------- AUTH ----------
-  async get_auth_me() {
+  /* ---------- AUTH ---------- */
+  async getAuthMe() {
     await mockDelay();
     return { data: MOCK_USER };
   },
 
-  async post_auth_login(data) {
+  async postAuthLogin() {
     await mockDelay();
-    console.log("🔐 Mock login:", data?.email);
     return { data: MOCK_USER };
   },
 
-  async post_auth_logout() {
+  async postAuthLogout() {
     await mockDelay();
-    return { data: { message: "Logged out" } };
+    return { data: { success: true } };
   },
 
-  async post_auth_signup() {
+  /* ---------- AGENTS ---------- */
+  async getAgents() {
     await mockDelay();
-    return { data: { message: "User created" } };
+    return { data: [...MOCK_AGENTS] };
   },
 
-  // ---------- AGENTS ----------
-  async get_agents() {
+  async postAgents(data) {
     await mockDelay();
-    const agents = MOCK_AGENTS.map((agent) => ({
-      ...agent,
-      lastHeartbeat: new Date(
-        Date.now() - agent.heartbeatAgeSec * 1000
-      ).toISOString(),
-      updatedAt: new Date(
-        Date.now() - agent.heartbeatAgeSec * 1000
-      ).toISOString(),
-    }));
-    return { data: agents };
-  },
+    const now = Date.now();
 
-  async post_agents(data) {
-    await mockDelay();
     const newAgent = {
-      _id: `mock-${Date.now()}`,
+      _id: `mock-${now}`,
       name: data.name,
-      token: `mock-token-${Math.random().toString(36).slice(2)}`,
       status: "OFFLINE",
-      lastHeartbeat: null,
-      heartbeatAgeSec: null,
-      missedHeartbeats: 0,
-      metadata: data.metadata || {},
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      createdAt: new Date(now).toISOString(),
+      updatedAt: new Date(now).toISOString(),
     };
+
+    MOCK_AGENTS.push(newAgent);
     return { data: newAgent };
   },
 
-  // ---------- METRICS ----------
-  async get_metrics(agentId, params) {
-    await mockDelay();
-    const range = params?.range || "5m";
-    return { data: generateMockMetrics(agentId, range) };
-  },
-
-  // ---------- ALERTS ----------
-  async get_alerts(params) {
-    await mockDelay();
-    let alerts = [...MOCK_ALERTS];
-
-    if (params?.status === "active") {
-      alerts = alerts.filter((a) => !a.resolvedAt);
-    } else if (params?.status === "resolved") {
-      alerts = alerts.filter((a) => a.resolvedAt);
-    }
-
-    const limit = params?.limit || 50;
-    alerts = alerts.slice(0, limit);
-
-    return { data: { count: alerts.length, data: alerts } };
-  },
-
-  async get_alerts_agent(agentId) {
+  /* ---------- METRICS ---------- */
+  async getMetrics(agentId, range) {
     await mockDelay();
     return {
-      data: MOCK_ALERTS.filter((a) => a.agentId === agentId),
+      data: generateMockMetrics(agentId, range),
     };
   },
 
-  async post_alerts_ack(id) {
+  /* ---------- ALERTS ---------- */
+  async getAlerts() {
     await mockDelay();
-    const alert = MOCK_ALERTS.find((a) => a._id === id);
-    if (alert) {
-      alert.acknowledgedAt = new Date().toISOString();
-      alert.acknowledgedBy = "admin@example.com";
-    }
-    return { data: alert || {} };
+    return { data: getMockAlerts() };
   },
 
-  async post_alerts_resolve(id) {
+  async postAlertAck(id) {
     await mockDelay();
-    const alert = MOCK_ALERTS.find((a) => a._id === id);
-    if (alert) {
-      alert.resolvedAt = new Date().toISOString();
-    }
-    return { data: alert || {} };
+    acknowledgeMockAlert(id);
+    return { data: { success: true } };
   },
 
-  // ---------- INCIDENTS ----------
-  async get_incidents(params) {
+  async postAlertResolve(id) {
     await mockDelay();
-    let incidents = [...MOCK_INCIDENTS];
-
-    if (params?.status && params.status !== "ALL") {
-      incidents = incidents.filter((i) => i.status === params.status);
-    }
-
-    return { data: incidents };
+    resolveMockAlert(id);
+    return { data: { success: true } };
   },
 
-  async get_incident(id) {
+  /* ---------- INCIDENTS ---------- */
+  async getIncidents() {
     await mockDelay();
-    return {
-      data: MOCK_INCIDENTS.find((i) => i._id === id) || null,
-    };
+    return { data: getMockIncidents() };
   },
 
-  async post_incidents(data) {
+  async getIncidentById(id) {
+    await mockDelay();
+    const incident = getMockIncidents().find(
+      (i) => i._id === id
+    );
+    return { data: incident || null };
+  },
+
+  async postIncident(data) {
     await mockDelay();
     return {
       data: {
         _id: `incident-${Date.now()}`,
-        agentId: data.agentId || null,
-        title: data.title,
-        message: data.message || "",
-        type: data.type || "CUSTOM",
-        severity: data.severity,
+        ...data,
         status: "OPEN",
-        acknowledged: false,
         createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
       },
     };
   },
 
-  async post_incident_acknowledge(id) {
+  async postIncidentResolve(id) {
     await mockDelay();
-    const incident = MOCK_INCIDENTS.find((i) => i._id === id);
-    if (incident) {
-      incident.acknowledged = true;
-      incident.acknowledgedAt = new Date().toISOString();
-    }
-    return { data: incident || {} };
+    resolveMockIncident(id);
+    return { data: { success: true } };
   },
 
-  async post_incident_resolve(id) {
+  async postIncidentAck(id) {
     await mockDelay();
-    const incident = MOCK_INCIDENTS.find((i) => i._id === id);
-    if (incident) {
-      incident.status = "RESOLVED";
-      incident.resolvedAt = new Date().toISOString();
-    }
-    return { data: incident || {} };
+    acknowledgeMockIncident(id);
+    return { data: { success: true } };
   },
 
-  // ---------- SLO ----------
-  async get_slo_uptime_24h() {
+  /* ---------- SLO ---------- */
+  async getSlo24h() {
     await mockDelay();
     return { data: generateMockSLOData(24, 5) };
   },
 
-  async get_slo_uptime_7d() {
+  async getSlo7d() {
     await mockDelay();
-    return { data: generateMockSLOData(24 * 7, 60) };
-  },
-
-  // ---------- HEALTH ----------
-  async get_health() {
-    await mockDelay();
-    return {
-      data: { status: "ok", timestamp: new Date().toISOString() },
-    };
+    return { data: generateMockSLOData(168, 60) };
   },
 };
 
-// ========================================
-// WRAPPED API (MOCK ↔ REAL)
-// ========================================
-const wrappedAPI = {
-  get(url, config) {
-    if (!USE_MOCK) return api.get(url, config);
+/* ========================================
+   WRAPPED API
+======================================== */
 
-    const [path, qs] = url.split("?");
-    const params =
-      config?.params ||
-      (qs ? Object.fromEntries(new URLSearchParams(qs)) : {});
+const api = {
+  async get(url, config) {
+    if (!USE_MOCK) return axiosInstance.get(url, config);
 
-    if (path === "/auth/me") return mockAPI.get_auth_me();
-    if (path === "/agents") return mockAPI.get_agents();
-    if (path.startsWith("/metrics/"))
-      return mockAPI.get_metrics(path.split("/")[2], params);
-    if (path === "/alerts") return mockAPI.get_alerts(params);
-    if (path.startsWith("/alerts/agent/"))
-      return mockAPI.get_alerts_agent(path.split("/")[3]);
-    if (path === "/incidents") return mockAPI.get_incidents(params);
-    if (path === "/health") return mockAPI.get_health();
-    if (path === "/slo/uptime/24h") return mockAPI.get_slo_uptime_24h();
-    if (path === "/slo/uptime/7d") return mockAPI.get_slo_uptime_7d();
+    const [path, queryString] = url.split("?");
+    const query = new URLSearchParams(queryString || "");
 
-    console.warn("⚠️ Unhandled mock GET:", path);
+    /* ---------- AUTH ---------- */
+    if (path === "/auth/me") return mockAPI.getAuthMe();
+
+    /* ---------- AGENTS ---------- */
+    if (path === "/agents") return mockAPI.getAgents();
+
+    /* ---------- METRICS ---------- */
+    if (path.startsWith("/metrics/")) {
+      const agentId = path.split("/")[2];
+      const range = query.get("range");
+      return mockAPI.getMetrics(agentId, range);
+    }
+
+    /* ---------- ALERTS ---------- */
+    if (path === "/alerts") return mockAPI.getAlerts();
+
+    /* ---------- INCIDENTS ---------- */
+    if (path === "/incidents") return mockAPI.getIncidents();
+
+    if (path.startsWith("/incidents/")) {
+      const id = path.split("/")[2];
+      return mockAPI.getIncidentById(id);
+    }
+
+    /* ---------- SLO ---------- */
+    if (path === "/slo/uptime/24h") return mockAPI.getSlo24h();
+    if (path === "/slo/uptime/7d") return mockAPI.getSlo7d();
+
     return Promise.resolve({ data: null });
   },
 
-  post(url, data, config) {
-    if (!USE_MOCK) return api.post(url, data, config);
+  async post(url, data) {
+    if (!USE_MOCK) return axiosInstance.post(url, data);
 
-    if (url === "/auth/login") return mockAPI.post_auth_login(data);
-    if (url === "/auth/logout") return mockAPI.post_auth_logout();
-    if (url === "/auth/signup") return mockAPI.post_auth_signup(data);
-    if (url === "/agents") return mockAPI.post_agents(data);
-    if (url === "/incidents") return mockAPI.post_incidents(data);
+    /* ---------- AUTH ---------- */
+    if (url === "/auth/login")
+      return mockAPI.postAuthLogin(data);
 
-    if (url.endsWith("/ack"))
-      return mockAPI.post_alerts_ack(url.split("/")[2]);
-    if (url.endsWith("/resolve"))
-      return mockAPI.post_alerts_resolve(url.split("/")[2]);
+    if (url === "/auth/logout")
+      return mockAPI.postAuthLogout();
 
-    console.warn("⚠️ Unhandled mock POST:", url);
+    /* ---------- AGENTS ---------- */
+    if (url === "/agents")
+      return mockAPI.postAgents(data);
+
+    /* ---------- ALERT ACK ---------- */
+    if (url.startsWith("/alerts/") && url.endsWith("/ack")) {
+      const id = url.split("/")[2];
+      return mockAPI.postAlertAck(id);
+    }
+
+    /* ---------- ALERT RESOLVE ---------- */
+    if (url.startsWith("/alerts/") && url.endsWith("/resolve")) {
+      const id = url.split("/")[2];
+      return mockAPI.postAlertResolve(id);
+    }
+
+    /* ---------- INCIDENT CREATE ---------- */
+    if (url === "/incidents")
+      return mockAPI.postIncident(data);
+
+    /* ---------- INCIDENT RESOLVE ---------- */
+    if (
+      url.startsWith("/incidents/") &&
+      url.endsWith("/resolve")
+    ) {
+      const id = url.split("/")[2];
+      return mockAPI.postIncidentResolve(id);
+    }
+
+    /* ---------- INCIDENT ACK ---------- */
+    if (
+      url.startsWith("/incidents/") &&
+      url.endsWith("/acknowledge")
+    ) {
+      const id = url.split("/")[2];
+      return mockAPI.postIncidentAck(id);
+    }
+
     return Promise.resolve({ data: null });
   },
 };
 
-export default wrappedAPI;
+export default api;
 export { USE_MOCK };

@@ -1,41 +1,60 @@
-const express = require("express");
-const cors = require("cors");
-const cookieParser = require("cookie-parser");
+import axios from "axios";
 
-const healthRoutes = require("./routes/health.routes");
-const agentRoutes = require("./routes/agent.routes");
-const metricRoutes = require("./routes/metric.routes");
-const authRoutes = require("./routes/auth.routes");
-const alertRoutes = require("./routes/alert.routes");
-const incidentRoutes = require("./routes/incident.routes");
-const rateLimiter = require("./middleware/rateLimit");
+/* ================= AXIOS INSTANCE ================= */
 
-const app = express();
+const api = axios.create({
+  baseURL: process.env.API_URL || "http://localhost:5000/api",
+  withCredentials: true,
+  headers: {
 
-/* ================= CORS ================= */
-app.use(
-  cors({
-    origin: [
-      "http://localhost:5173",
-      "http://localhost:5174",
-      "https://monitoring-platform-control-plane-u.vercel.app",
-    ],
-    credentials: true,
-  })
-);
+    "Content-Type": "application/json",
+  },
+  timeout: 15000,
+});
 
-/* ================= MIDDLEWARE ================= */
-app.use(express.json());
-app.use(cookieParser());
-app.use(rateLimiter);
+/* ================= API CLIENT ================= */
 
-/* ================= ROUTES ================= */
-app.use("/health", healthRoutes);
-app.use("/agents", agentRoutes);
-app.use("/metrics", metricRoutes);
-app.use("/auth", authRoutes);
-app.use("/alerts", alertRoutes);
-app.use("/incidents", incidentRoutes);
-app.use("/slo", require("./routes/slo.routes"));
+const apiClient = {
+  // AUTH
+  async login(data) {
+    return (await api.post("/auth/login", data)).data;
+  },
 
-module.exports = app;
+  async logout() {
+    return (await api.post("/auth/logout")).data;
+  },
+
+  async me() {
+    return (await api.get("/auth/me")).data;
+  },
+
+  // AGENTS
+  async get_agents() {
+    return (await api.get("/agents")).data;
+  },
+
+  async post_agents(data) {
+    return (await api.post("/agents", data)).data;
+  },
+
+  async get_agent(id) {
+    return (await api.get(`/agents/${id}`)).data;
+  },
+
+  // METRICS
+  async get_metrics(agentId) {
+    return (await api.get(`/metrics/${agentId}`)).data;
+  },
+
+  // INCIDENTS
+  async get_incidents() {
+    return (await api.get("/incidents")).data;
+  },
+
+  // ALERTS
+  async get_alerts() {
+    return (await api.get("/alerts")).data;
+  },
+};
+
+export default apiClient;

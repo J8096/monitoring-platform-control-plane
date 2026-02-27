@@ -37,57 +37,88 @@ export default function CreateAgentModal({ onClose }) {
     }
   }
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-      <div className="w-full max-w-md rounded-xl bg-slate-900 border border-slate-800 shadow-xl p-6">
-        {/* ================= HEADER ================= */}
-        <h2 className="text-lg font-semibold text-white mb-4">
+return (
+  <div className="fixed inset-0 z-50 flex items-center justify-center">
+    {/* BACKDROP */}
+    <div
+      className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+      onClick={handleClose}
+    />
+
+    {/* MODAL */}
+    <div className="relative w-full max-w-md rounded-2xl bg-slate-900 border border-slate-800 shadow-2xl">
+      
+      {/* HEADER */}
+      <div className="px-6 py-4 border-b border-slate-800">
+        <h2 className="text-lg font-semibold text-white">
           Create Agent
         </h2>
+        <p className="text-sm text-slate-400 mt-1">
+          Register a new infrastructure agent
+        </p>
+      </div>
 
-        {/* ================= FORM ================= */}
+      {/* BODY */}
+      <div className="px-6 py-5">
         {!agent && (
           <form onSubmit={handleCreate} className="space-y-4">
             <input
-              className="w-full rounded-md bg-slate-950 border border-slate-700 px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              placeholder="Agent name"
+              autoFocus
+              className="
+                w-full rounded-lg
+                bg-slate-950
+                border border-slate-700
+                px-4 py-2.5
+                text-sm text-white
+                placeholder-slate-500
+                focus:outline-none
+                focus:ring-2 focus:ring-indigo-500
+              "
+              placeholder="e.g. web-server-02"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              required
             />
 
             {error && (
-              <div className="text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded p-2">
+              <div className="text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-md p-2">
                 {error}
               </div>
             )}
 
-            {/* ================= ACTIONS ================= */}
+            {/* FOOTER ACTIONS */}
             <div className="flex justify-end gap-3 pt-2">
               <button
                 type="button"
                 onClick={handleClose}
-                className="px-4 py-2 text-sm rounded-md border border-slate-700 text-slate-300 hover:bg-slate-800"
+                className="px-4 py-2 text-sm rounded-lg text-slate-300 hover:bg-slate-800"
               >
                 Cancel
               </button>
 
               <button
                 type="submit"
-                disabled={loading}
-                className="px-4 py-2 text-sm rounded-md bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white"
+                disabled={loading || !name.trim()}
+                className="
+                  px-5 py-2
+                  text-sm font-medium
+                  rounded-lg
+                  bg-indigo-600
+                  hover:bg-indigo-500
+                  disabled:opacity-50
+                  text-white
+                "
               >
-                {loading ? "Creating…" : "Create"}
+                {loading ? "Creating…" : "Create Agent"}
               </button>
             </div>
           </form>
         )}
 
-        {/* ================= SUCCESS ================= */}
+        {/* SUCCESS STATE */}
         {agent && (
           <div className="space-y-4">
             <div className="text-emerald-400 font-medium">
-              Agent created
+              Agent created successfully
             </div>
 
             <Field label="Agent ID">
@@ -102,11 +133,10 @@ export default function CreateAgentModal({ onClose }) {
               Save this token now. You won’t see it again.
             </p>
 
-            {/* ================= FOOTER ================= */}
-            <div className="flex justify-end pt-2 pr-4">
+            <div className="flex justify-end pt-2">
               <button
                 onClick={handleClose}
-                className="px-4 py-2 text-sm rounded-md bg-slate-800 hover:bg-slate-700 text-white"
+                className="px-4 py-2 text-sm rounded-lg bg-slate-800 hover:bg-slate-700 text-white"
               >
                 Close
               </button>
@@ -115,7 +145,8 @@ export default function CreateAgentModal({ onClose }) {
         )}
       </div>
     </div>
-  );
+  </div>
+);
 }
 
 /* ================= HELPER ================= */

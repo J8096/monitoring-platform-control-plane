@@ -5,65 +5,48 @@ import api from "../api/api";
 import Header from "./Header";
 import Sidebar from "./sidebar";
 
-/**
- * APP LAYOUT — POLISHED ENTERPRISE CONTROL PLANE
- *
- * ✔ Clean authentication shell
- * ✔ Global agent state management
- * ✔ Sidebar agent selection
- * ✔ Central data source for pages
- * ✔ Safe polling & cleanup
- */
-
 export default function AppLayout() {
   const navigate = useNavigate();
 
-  /* ================= AUTH ================= */
+  /* ── Auth ── */
   const [user, setUser] = useState(null);
   const [loadingUser, setLoadingUser] = useState(true);
 
-  /* ================= AGENTS (GLOBAL) ================= */
+  /* ── Agents ── */
   const [agents, setAgents] = useState([]);
   const [activeAgent, setActiveAgent] = useState(null);
   const [agentsLoading, setAgentsLoading] = useState(true);
 
-  /* ================= LOAD USER ================= */
+  /* ── Load user ── */
   useEffect(() => {
     let alive = true;
-
     async function loadUser() {
       try {
         const res = await api.get("/auth/me");
-        if (!alive) return;
-        setUser(res.data ?? null);
+        if (alive) setUser(res.data ?? null);
       } catch {
         if (alive) setUser(null);
       } finally {
         if (alive) setLoadingUser(false);
       }
     }
-
     loadUser();
-    return () => {
-      alive = false;
-    };
+    return () => { alive = false; };
   }, []);
 
-  /* ================= LOAD AGENTS ================= */
+  /* ── Load agents ── */
   const loadAgents = useCallback(async () => {
     try {
       const res = await api.get("/agents");
       const data = res.data ?? [];
-
       setAgents(data);
-
-      // Keep active agent stable if possible
-      setActiveAgent((prev) => {
-        if (!prev) return data[0] ?? null;
-        return data.find((a) => a._id === prev._id) ?? data[0] ?? null;
-      });
+      setActiveAgent(prev =>
+        prev
+          ? (data.find(a => a._id === prev._id) ?? data[0] ?? null)
+          : (data[0] ?? null)
+      );
     } catch {
-      // silent by design (network hiccups allowed)
+      /* silent */
     } finally {
       setAgentsLoading(false);
     }
@@ -71,38 +54,35 @@ export default function AppLayout() {
 
   useEffect(() => {
     let alive = true;
-
     if (alive) loadAgents();
-    const interval = setInterval(loadAgents, 5000);
-
-    return () => {
-      alive = false;
-      clearInterval(interval);
-    };
+    const id = setInterval(loadAgents, 5000);
+    return () => { alive = false; clearInterval(id); };
   }, [loadAgents]);
 
-  /* ================= LOGOUT ================= */
+  /* ── Logout ── */
   const handleLogout = useCallback(async () => {
-    try {
-      await api.post("/auth/logout");
-    } finally {
+    try { await api.post("/auth/logout"); } finally {
       navigate("/login", { replace: true });
     }
   }, [navigate]);
 
-  /* ================= UI ================= */
+  /* ── Render ── */
   return (
-    <div className="h-screen bg-slate-950 text-slate-100 flex flex-col overflow-hidden">
-      {/* ================= HEADER ================= */}
-      <Header
-        user={user}
-        loading={loadingUser}
-        onLogout={handleLogout}
-      />
+    <div style={{
+      display: "flex",
+      flexDirection: "column",
+      height: "100vh",
+      overflow: "hidden",
+      background: "#070b12",
+      color: "#f1f5f9",
+    }}>
+      {/* Header */}
+      <Header user={user} loading={loadingUser} onLogout={handleLogout} />
 
-      {/* ================= BODY ================= */}
-      <div className="flex flex-1 overflow-hidden">
-        {/* ================= SIDEBAR ================= */}
+      {/* Body */}
+      <div style={{ display: "flex", flex: 1, minHeight: 0, overflow: "hidden" }}>
+
+        {/* Sidebar — fixed width, never shrinks */}
         <Sidebar
           agents={agents}
           activeAgent={activeAgent}
@@ -110,17 +90,17 @@ export default function AppLayout() {
           loading={agentsLoading}
         />
 
-        {/* ================= MAIN CONTENT ================= */}
-        <main className="flex-1 overflow-hidden bg-slate-950">
-          <Outlet
-            context={{
-              user,
-              agents,
-              activeAgent,
-              reloadAgents: loadAgents, // 🔥 allows CreateAgentModal to refresh list
-            }}
-          />
+        {/* Main content — takes remaining space, independently scrollable */}
+        <main style={{
+          flex: 1,
+          minWidth: 0,
+          minHeight: 0,
+          overflowY: "auto",
+          background: "#080c14",
+        }}>
+          <Outlet context={{ user, agents, activeAgent, reloadAgents: loadAgents }} />
         </main>
+
       </div>
     </div>
   );
