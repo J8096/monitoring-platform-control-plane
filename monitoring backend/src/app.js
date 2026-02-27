@@ -1,5 +1,6 @@
 const express = require("express");
 const cors = require("cors");
+const cookieParser = require("cookie-parser");
 
 const authRoutes = require("./routes/auth.routes");
 const agentRoutes = require("./routes/agent.routes");
@@ -36,6 +37,7 @@ app.use(
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(cookieParser()); // ✅ REQUIRED for JWT cookie auth
 
 /* ================= HEALTH CHECK ================= */
 
