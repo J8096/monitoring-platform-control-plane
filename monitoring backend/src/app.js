@@ -6,11 +6,7 @@ const API_BASE =
   import.meta.env.VITE_API_URL ||
   "https://monitoring-platform-control-plane-3.onrender.com/api";
 
-if (!API_BASE) {
-  console.error("❌ API base URL is not defined.");
-} else {
-  console.log("🚀 API BASE:", API_BASE);
-}
+console.log("🚀 API BASE:", API_BASE);
 
 /* ================= AXIOS INSTANCE ================= */
 
@@ -20,7 +16,7 @@ const api = axios.create({
   headers: {
     "Content-Type": "application/json",
   },
-  timeout: 20000, // increased slightly for Render cold start
+  timeout: 20000, // allow cold start delay
 });
 
 /* ================= RESPONSE INTERCEPTOR ================= */
@@ -28,12 +24,10 @@ const api = axios.create({
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    // Timeout handling
     if (error.code === "ECONNABORTED") {
-      console.error("⏳ Request timed out.");
+      console.error("⏳ Request timed out (possible cold start).");
     }
 
-    // Auth expired handling
     if (error.response?.status === 401) {
       if (!window.location.pathname.startsWith("/login")) {
         window.location.href = "/login";
@@ -48,51 +42,51 @@ api.interceptors.response.use(
 
 const apiClient = {
   /* ---------- AUTH ---------- */
-  async login(data) {
+  login: async (data) => {
     const res = await api.post("/auth/login", data);
     return res.data;
   },
 
-  async logout() {
+  logout: async () => {
     const res = await api.post("/auth/logout");
     return res.data;
   },
 
-  async me() {
+  me: async () => {
     const res = await api.get("/auth/me");
     return res.data;
   },
 
   /* ---------- AGENTS ---------- */
-  async get_agents() {
+  get_agents: async () => {
     const res = await api.get("/agents");
     return res.data;
   },
 
-  async post_agents(data) {
+  post_agents: async (data) => {
     const res = await api.post("/agents", data);
     return res.data;
   },
 
-  async get_agent(id) {
+  get_agent: async (id) => {
     const res = await api.get(`/agents/${id}`);
     return res.data;
   },
 
   /* ---------- METRICS ---------- */
-  async get_metrics(agentId) {
+  get_metrics: async (agentId) => {
     const res = await api.get(`/metrics/${agentId}`);
     return res.data;
   },
 
   /* ---------- INCIDENTS ---------- */
-  async get_incidents() {
+  get_incidents: async () => {
     const res = await api.get("/incidents");
     return res.data;
   },
 
   /* ---------- ALERTS ---------- */
-  async get_alerts() {
+  get_alerts: async () => {
     const res = await api.get("/alerts");
     return res.data;
   },
