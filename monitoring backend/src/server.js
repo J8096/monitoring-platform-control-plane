@@ -11,29 +11,29 @@ const runOfflineCheck = require("./utils/offlineChecker");
 
 const httpServer = http.createServer(app);
 
-/* ================= ALLOWED ORIGINS ================= */
-/**
- * IMPORTANT:
- * - Must match EXACT frontend URLs
- * - No trailing slashes
- */
-const ALLOWED_ORIGINS = [
-  "http://localhost:5173",
-  "http://localhost:5174",
-  "https://monitoring-platform-control-plane-u.vercel.app",
-];
-
-
-
 /* ================= SOCKET.IO ================= */
+/*
+  Production-safe CORS:
+  - Allow localhost
+  - Allow any vercel.app deployment
+  - Allow specific production frontend via env
+*/
 
 const io = new Server(httpServer, {
   cors: {
     origin: (origin, callback) => {
-      // Allow server-to-server & Postman
+      // Allow server-to-server tools (Postman, curl)
       if (!origin) return callback(null, true);
 
-      if (ALLOWED_ORIGINS.includes(origin)) {
+      const isLocal = origin.startsWith("http://localhost");
+
+      const isVercel = origin.endsWith(".vercel.app");
+
+      const isExplicitFrontend =
+        process.env.FRONTEND_URL &&
+        origin === process.env.FRONTEND_URL;
+
+      if (isLocal || isVercel || isExplicitFrontend) {
         return callback(null, true);
       }
 
@@ -67,24 +67,21 @@ const PORT = process.env.PORT || 5000;
 
 async function startServer() {
   try {
-    /* ---------- DB ---------- */
     await connectDB();
     console.log("✅ MongoDB connected");
 
-    /* ---------- OFFLINE CHECKER (ONCE) ---------- */
     if (!global.__offlineIntervalStarted) {
       global.__offlineIntervalStarted = true;
 
       setInterval(async () => {
         try {
-          await runOfflineCheck(io); // 👈 pass io for live updates
+          await runOfflineCheck(io);
         } catch (err) {
           console.error("❌ Offline checker failed:", err.message);
         }
       }, 10_000);
     }
 
-    /* ---------- HTTP + WS ---------- */
     httpServer.listen(PORT, "0.0.0.0", () => {
       console.log(`🚀 Server + WebSocket running on port ${PORT}`);
     });

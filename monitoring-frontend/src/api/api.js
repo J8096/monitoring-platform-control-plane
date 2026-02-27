@@ -21,10 +21,19 @@ const USE_MOCK = shouldUseMockData();
 console.log("🔧 API Mode:", USE_MOCK ? "MOCK DATA" : "REAL BACKEND");
 
 /* ========================================
-   REAL BACKEND AXIOS INSTANCE
+   BASE URL (IMPORTANT)
+   Include /api here once.
 ======================================== */
 
-const API_BASE = import.meta.env.VITE_API_URL;
+const API_BASE =
+  import.meta.env.VITE_API_URL ||
+  "https://monitoring-platform-control-plane-3.onrender.com/api";
+
+console.log("🚀 API BASE:", API_BASE);
+
+/* ========================================
+   AXIOS INSTANCE
+======================================== */
 
 const axiosInstance = axios.create({
   baseURL: API_BASE,
@@ -57,7 +66,6 @@ const mockDelay = () =>
 ======================================== */
 
 const mockAPI = {
-  /* ---------- AUTH ---------- */
   async getAuthMe() {
     await mockDelay();
     return { data: MOCK_USER };
@@ -73,7 +81,6 @@ const mockAPI = {
     return { data: { success: true } };
   },
 
-  /* ---------- AGENTS ---------- */
   async getAgents() {
     await mockDelay();
     return { data: [...MOCK_AGENTS] };
@@ -95,15 +102,11 @@ const mockAPI = {
     return { data: newAgent };
   },
 
-  /* ---------- METRICS ---------- */
   async getMetrics(agentId, range) {
     await mockDelay();
-    return {
-      data: generateMockMetrics(agentId, range),
-    };
+    return { data: generateMockMetrics(agentId, range) };
   },
 
-  /* ---------- ALERTS ---------- */
   async getAlerts() {
     await mockDelay();
     return { data: getMockAlerts() };
@@ -121,7 +124,6 @@ const mockAPI = {
     return { data: { success: true } };
   },
 
-  /* ---------- INCIDENTS ---------- */
   async getIncidents() {
     await mockDelay();
     return { data: getMockIncidents() };
@@ -129,9 +131,7 @@ const mockAPI = {
 
   async getIncidentById(id) {
     await mockDelay();
-    const incident = getMockIncidents().find(
-      (i) => i._id === id
-    );
+    const incident = getMockIncidents().find((i) => i._id === id);
     return { data: incident || null };
   },
 
@@ -159,7 +159,6 @@ const mockAPI = {
     return { data: { success: true } };
   },
 
-  /* ---------- SLO ---------- */
   async getSlo24h() {
     await mockDelay();
     return { data: generateMockSLOData(24, 5) };
@@ -182,23 +181,16 @@ const api = {
     const [path, queryString] = url.split("?");
     const query = new URLSearchParams(queryString || "");
 
-    /* ---------- AUTH ---------- */
     if (path === "/auth/me") return mockAPI.getAuthMe();
-
-    /* ---------- AGENTS ---------- */
     if (path === "/agents") return mockAPI.getAgents();
 
-    /* ---------- METRICS ---------- */
     if (path.startsWith("/metrics/")) {
       const agentId = path.split("/")[2];
       const range = query.get("range");
       return mockAPI.getMetrics(agentId, range);
     }
 
-    /* ---------- ALERTS ---------- */
     if (path === "/alerts") return mockAPI.getAlerts();
-
-    /* ---------- INCIDENTS ---------- */
     if (path === "/incidents") return mockAPI.getIncidents();
 
     if (path.startsWith("/incidents/")) {
@@ -206,7 +198,6 @@ const api = {
       return mockAPI.getIncidentById(id);
     }
 
-    /* ---------- SLO ---------- */
     if (path === "/slo/uptime/24h") return mockAPI.getSlo24h();
     if (path === "/slo/uptime/7d") return mockAPI.getSlo7d();
 
@@ -216,47 +207,28 @@ const api = {
   async post(url, data) {
     if (!USE_MOCK) return axiosInstance.post(url, data);
 
-    /* ---------- AUTH ---------- */
-    if (url === "/auth/login")
-      return mockAPI.postAuthLogin(data);
+    if (url === "/auth/login") return mockAPI.postAuthLogin(data);
+    if (url === "/auth/logout") return mockAPI.postAuthLogout();
+    if (url === "/agents") return mockAPI.postAgents(data);
 
-    if (url === "/auth/logout")
-      return mockAPI.postAuthLogout();
-
-    /* ---------- AGENTS ---------- */
-    if (url === "/agents")
-      return mockAPI.postAgents(data);
-
-    /* ---------- ALERT ACK ---------- */
     if (url.startsWith("/alerts/") && url.endsWith("/ack")) {
       const id = url.split("/")[2];
       return mockAPI.postAlertAck(id);
     }
 
-    /* ---------- ALERT RESOLVE ---------- */
     if (url.startsWith("/alerts/") && url.endsWith("/resolve")) {
       const id = url.split("/")[2];
       return mockAPI.postAlertResolve(id);
     }
 
-    /* ---------- INCIDENT CREATE ---------- */
-    if (url === "/incidents")
-      return mockAPI.postIncident(data);
+    if (url === "/incidents") return mockAPI.postIncident(data);
 
-    /* ---------- INCIDENT RESOLVE ---------- */
-    if (
-      url.startsWith("/incidents/") &&
-      url.endsWith("/resolve")
-    ) {
+    if (url.startsWith("/incidents/") && url.endsWith("/resolve")) {
       const id = url.split("/")[2];
       return mockAPI.postIncidentResolve(id);
     }
 
-    /* ---------- INCIDENT ACK ---------- */
-    if (
-      url.startsWith("/incidents/") &&
-      url.endsWith("/acknowledge")
-    ) {
+    if (url.startsWith("/incidents/") && url.endsWith("/acknowledge")) {
       const id = url.split("/")[2];
       return mockAPI.postIncidentAck(id);
     }

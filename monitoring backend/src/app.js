@@ -2,11 +2,16 @@ import axios from "axios";
 
 /* ================= AXIOS INSTANCE ================= */
 
+const API_BASE =
+  import.meta.env.VITE_API_URL ||
+  "https://monitoring-platform-control-plane-3.onrender.com/api";
+
+console.log("API BASE:", API_BASE);
+
 const api = axios.create({
-  baseURL: process.env.API_URL || "http://localhost:5000/api",
+  baseURL: API_BASE,
   withCredentials: true,
   headers: {
-
     "Content-Type": "application/json",
   },
   timeout: 15000,
