@@ -6,6 +6,7 @@ const authRoutes = require("./routes/auth.routes");
 const agentRoutes = require("./routes/agent.routes");
 const incidentRoutes = require("./routes/incident.routes");
 const alertRoutes = require("./routes/alert.routes");
+const metricsRoutes = require("./routes/metrics.routes"); // ✅ ADD THIS
 
 const app = express();
 
@@ -26,7 +27,6 @@ app.use(
         return callback(null, true);
       }
 
-      console.error("❌ CORS blocked:", origin);
       return callback(new Error("Not allowed by CORS"));
     },
     credentials: true,
@@ -37,13 +37,7 @@ app.use(
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(cookieParser()); // ✅ REQUIRED for JWT cookie auth
-
-/* ================= HEALTH CHECK ================= */
-
-app.get("/api/health", (req, res) => {
-  res.status(200).json({ status: "ok" });
-});
+app.use(cookieParser());
 
 /* ================= ROUTES ================= */
 
@@ -51,6 +45,13 @@ app.use("/api/auth", authRoutes);
 app.use("/api/agents", agentRoutes);
 app.use("/api/incidents", incidentRoutes);
 app.use("/api/alerts", alertRoutes);
+app.use("/api/metrics", metricsRoutes); // ✅ THIS FIXES 404
+
+/* ================= HEALTH ================= */
+
+app.get("/api/health", (req, res) => {
+  res.json({ status: "ok" });
+});
 
 /* ================= 404 ================= */
 
