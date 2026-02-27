@@ -1,95 +1,59 @@
-import axios from "axios";
+const express = require("express");
+const cors = require("cors");
 
-/* ================= BASE URL ================= */
+const authRoutes = require("./routes/auth.routes");
+const agentRoutes = require("./routes/agent.routes");
+const incidentRoutes = require("./routes/incident.routes");
+const alertRoutes = require("./routes/alert.routes");
 
-const API_BASE =
-  import.meta.env.VITE_API_URL ||
-  "https://monitoring-platform-control-plane-3.onrender.com/api";
+const app = express();
 
-console.log("🚀 API BASE:", API_BASE);
+/* ================= CORS ================= */
 
-/* ================= AXIOS INSTANCE ================= */
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      if (!origin) return callback(null, true);
 
-const api = axios.create({
-  baseURL: API_BASE,
-  withCredentials: true,
-  headers: {
-    "Content-Type": "application/json",
-  },
-  timeout: 20000, // allow cold start delay
-});
+      const isLocal = origin.startsWith("http://localhost");
+      const isVercel = origin.endsWith(".vercel.app");
+      const isExplicit =
+        process.env.FRONTEND_URL &&
+        origin === process.env.FRONTEND_URL;
 
-/* ================= RESPONSE INTERCEPTOR ================= */
-
-api.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    if (error.code === "ECONNABORTED") {
-      console.error("⏳ Request timed out (possible cold start).");
-    }
-
-    if (error.response?.status === 401) {
-      if (!window.location.pathname.startsWith("/login")) {
-        window.location.href = "/login";
+      if (isLocal || isVercel || isExplicit) {
+        return callback(null, true);
       }
-    }
 
-    return Promise.reject(error);
-  }
+      console.error("❌ CORS blocked:", origin);
+      return callback(new Error("Not allowed by CORS"));
+    },
+    credentials: true,
+  })
 );
 
-/* ================= API CLIENT ================= */
+/* ================= MIDDLEWARE ================= */
 
-const apiClient = {
-  /* ---------- AUTH ---------- */
-  login: async (data) => {
-    const res = await api.post("/auth/login", data);
-    return res.data;
-  },
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
-  logout: async () => {
-    const res = await api.post("/auth/logout");
-    return res.data;
-  },
+/* ================= HEALTH CHECK ================= */
 
-  me: async () => {
-    const res = await api.get("/auth/me");
-    return res.data;
-  },
+app.get("/api/health", (req, res) => {
+  res.status(200).json({ status: "ok" });
+});
 
-  /* ---------- AGENTS ---------- */
-  get_agents: async () => {
-    const res = await api.get("/agents");
-    return res.data;
-  },
+/* ================= ROUTES ================= */
 
-  post_agents: async (data) => {
-    const res = await api.post("/agents", data);
-    return res.data;
-  },
+app.use("/api/auth", authRoutes);
+app.use("/api/agents", agentRoutes);
+app.use("/api/incidents", incidentRoutes);
+app.use("/api/alerts", alertRoutes);
 
-  get_agent: async (id) => {
-    const res = await api.get(`/agents/${id}`);
-    return res.data;
-  },
+/* ================= 404 ================= */
 
-  /* ---------- METRICS ---------- */
-  get_metrics: async (agentId) => {
-    const res = await api.get(`/metrics/${agentId}`);
-    return res.data;
-  },
+app.use((req, res) => {
+  res.status(404).json({ error: "Route not found" });
+});
 
-  /* ---------- INCIDENTS ---------- */
-  get_incidents: async () => {
-    const res = await api.get("/incidents");
-    return res.data;
-  },
-
-  /* ---------- ALERTS ---------- */
-  get_alerts: async () => {
-    const res = await api.get("/alerts");
-    return res.data;
-  },
-};
-
-export default apiClient;
+module.exports = app;
