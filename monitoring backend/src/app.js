@@ -6,7 +6,7 @@ const authRoutes = require("./routes/auth.routes");
 const agentRoutes = require("./routes/agent.routes");
 const incidentRoutes = require("./routes/incident.routes");
 const alertRoutes = require("./routes/alert.routes");
-const metricsRoutes = require("./routes/metrics.routes"); // ✅ ADD THIS
+const metricsRoutes = require("./routes/metric.routes");
 
 const app = express();
 
