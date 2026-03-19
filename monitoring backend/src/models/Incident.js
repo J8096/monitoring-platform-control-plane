@@ -8,9 +8,8 @@ const IncidentSchema = new mongoose.Schema(
       index: true,
     },
 
-    // 👇 REQUIRED BY UI
     agent: {
-      type: String, // agent name / hostname
+      type: String, // agent name / hostname for display
     },
 
     severity: {
@@ -20,22 +19,22 @@ const IncidentSchema = new mongoose.Schema(
       index: true,
     },
 
-    // 👇 REQUIRED BY UI (filters + stats)
     type: {
       type: String,
-      enum: ["CPU", "MEMORY", "OFFLINE"],
-      required: true,
+      enum: ["CPU", "MEMORY", "OFFLINE", "CUSTOM"],
+      default: "CUSTOM",
       index: true,
     },
 
     title: {
       type: String,
       required: true,
+      trim: true,
     },
 
-    // 👇 REQUIRED BY UI search
     message: {
       type: String,
+      trim: true,
     },
 
     status: {
@@ -45,20 +44,26 @@ const IncidentSchema = new mongoose.Schema(
       index: true,
     },
 
-    // 👇 REQUIRED BY UI
     acknowledged: {
       type: Boolean,
       default: false,
     },
 
-    acknowledgedBy: {
-      type: String,
-    },
+    acknowledgedBy: String,
+    acknowledgedAt: Date,
 
     resolvedAt: Date,
     resolvedBy: String,
+
+    alertIds: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Alert",
+      },
+    ],
   },
   { timestamps: true }
 );
 
-module.exports = mongoose.model("Incident", IncidentSchema);
+module.exports =
+  mongoose.models.Incident || mongoose.model("Incident", IncidentSchema);

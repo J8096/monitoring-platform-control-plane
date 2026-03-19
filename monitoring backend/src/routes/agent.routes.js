@@ -2,14 +2,14 @@ const express = require("express");
 const crypto = require("crypto");
 
 const Agent = require("../models/Agent");
-const Metric = require("../models/metric1");
+const Metric = require("../models/Metric");
 const requireAuth = require("../middleware/requireAuth");
 const { checkThreshold } = require("../utils/thresholdChecker");
 
 const router = express.Router();
 
 /* ============================
-   GET /agents (AUTH REQUIRED)
+   GET /agents
 ============================ */
 router.get("/", requireAuth, async (req, res) => {
   try {
@@ -22,21 +22,20 @@ router.get("/", requireAuth, async (req, res) => {
 });
 
 /* ============================
-   POST /agents (CREATE AGENT)
+   POST /agents (CREATE)
 ============================ */
 router.post("/", requireAuth, async (req, res) => {
   try {
     const { name, metadata } = req.body;
 
-    if (!name) {
-      return res.status(400).json({ message: "Agent name required" });
+    if (!name || typeof name !== "string" || !name.trim()) {
+      return res.status(400).json({ message: "Agent name is required" });
     }
 
-    // 🔐 Secure token (shown once)
     const token = crypto.randomBytes(32).toString("hex");
 
     const agent = await Agent.create({
-      name,
+      name: name.trim(),
       token,
       status: "OFFLINE",
       metadata,
@@ -44,6 +43,7 @@ router.post("/", requireAuth, async (req, res) => {
       missedHeartbeats: 0,
     });
 
+    // Return token only once — it cannot be recovered
     res.status(201).json({
       _id: agent._id,
       name: agent.name,
@@ -56,8 +56,22 @@ router.post("/", requireAuth, async (req, res) => {
 });
 
 /* ============================
+   DELETE /agents/:id
+============================ */
+router.delete("/:id", requireAuth, async (req, res) => {
+  try {
+    const agent = await Agent.findByIdAndDelete(req.params.id);
+    if (!agent) return res.status(404).json({ message: "Agent not found" });
+    res.json({ message: "Agent deleted" });
+  } catch (err) {
+    console.error("❌ Delete agent failed:", err);
+    res.status(500).json({ message: "Failed to delete agent" });
+  }
+});
+
+/* ============================
    POST /agents/:id/heartbeat
-   (AGENT TOKEN AUTH)
+   Agent token auth (Bearer)
 ============================ */
 router.post("/:id/heartbeat", async (req, res) => {
   try {
@@ -74,7 +88,11 @@ router.post("/:id/heartbeat", async (req, res) => {
     }
 
     if (typeof cpu !== "number" || typeof memory !== "number") {
-      return res.status(400).json({ message: "Invalid metrics payload" });
+      return res.status(400).json({ message: "cpu and memory must be numbers" });
+    }
+
+    if (cpu < 0 || cpu > 100 || memory < 0 || memory > 100) {
+      return res.status(400).json({ message: "cpu and memory must be 0–100" });
     }
 
     const agent = await Agent.findOne({ _id: id, token });
@@ -82,24 +100,20 @@ router.post("/:id/heartbeat", async (req, res) => {
       return res.status(401).json({ message: "Invalid agent credentials" });
     }
 
-    /* ================= UPDATE AGENT ================= */
+    /* ── Update agent ── */
     agent.cpu = cpu;
     agent.memory = memory;
     agent.status = "HEALTHY";
     agent.lastHeartbeat = new Date();
     agent.missedHeartbeats = 0;
-    agent.metadata = { ...agent.metadata, ...metadata };
+    if (metadata) agent.metadata = { ...agent.metadata, ...metadata };
 
     await agent.save();
 
-    /* ================= SAVE METRIC ================= */
-    const metric = await Metric.create({
-      agent: agent._id,
-      cpu,
-      memory,
-    });
+    /* ── Save metric ── */
+    const metric = await Metric.create({ agent: agent._id, cpu, memory });
 
-    /* ================= LIVE METRICS (SOCKET.IO) ================= */
+    /* ── Live metrics via Socket.IO ── */
     const io = req.app.get("io");
     if (io) {
       io.to(agent._id.toString()).emit("metrics:update", {
@@ -110,23 +124,23 @@ router.post("/:id/heartbeat", async (req, res) => {
       });
     }
 
-    /* ================= ALERTS ================= */
+    /* ── Threshold checks ── */
     await checkThreshold({
-      agent: agent._id,
+      agentId: agent._id,
       type: "CPU_HIGH",
       value: cpu,
       threshold: 90,
       severity: "P2",
-      message: `CPU usage high (${cpu}%)`,
+      message: `CPU usage high (${cpu}%) on ${agent.name}`,
     });
 
     await checkThreshold({
-      agent: agent._id,
+      agentId: agent._id,
       type: "MEMORY_HIGH",
       value: memory,
       threshold: 90,
       severity: "P2",
-      message: `Memory usage high (${memory}%)`,
+      message: `Memory usage high (${memory}%) on ${agent.name}`,
     });
 
     res.json({ ok: true, metricId: metric._id });

@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
-import { io } from "socket.io-client";
+import { socket } from "../api/socket";
 
-const socket = io(import.meta.env.VITE_API_URL, {
-  withCredentials: true,
-});
-
+/**
+ * Subscribe to live metrics for a specific agent via Socket.IO.
+ * Uses the shared socket instance (real or mock).
+ */
 export default function useLiveMetrics(agentId) {
   const [metrics, setMetrics] = useState(null);
 
@@ -12,11 +12,11 @@ export default function useLiveMetrics(agentId) {
     if (!agentId) return;
 
     socket.emit("subscribe:metrics", agentId);
-
-    socket.on("metrics", setMetrics);
+    socket.on("metrics:update", setMetrics);
 
     return () => {
-      socket.off("metrics");
+      socket.emit("unsubscribe:metrics", agentId);
+      socket.off("metrics:update", setMetrics);
     };
   }, [agentId]);
 

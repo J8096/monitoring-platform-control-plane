@@ -1,4 +1,4 @@
-const Metric = require("../models/metric1");
+const Metric = require("../models/Metric");
 const { io } = require("../server");
 
 /**

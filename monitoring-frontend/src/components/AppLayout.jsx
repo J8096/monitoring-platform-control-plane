@@ -3,7 +3,7 @@ import { Outlet, useNavigate } from "react-router-dom";
 import api from "../api/api";
 
 import Header from "./Header";
-import Sidebar from "./sidebar";
+import Sidebar from "./Sidebar";
 
 export default function AppLayout() {
   const navigate = useNavigate();

@@ -2,48 +2,33 @@ const Alert = require("../models/Alert");
 const { attachAlertToIncident, tryResolveIncident } = require("../services/incidentMatcher");
 
 /**
- * Generic threshold checker
- * Used for CPU, Memory, Disk, etc.
+ * Generic threshold checker — CPU, Memory, Disk, etc.
+ * Creates an alert when a metric exceeds threshold,
+ * resolves it when the metric recovers.
+ *
+ * @param {Object} opts
+ * @param {ObjectId} opts.agentId
+ * @param {string}   opts.type      - e.g. "CPU_HIGH"
+ * @param {number}   opts.value     - current metric value
+ * @param {number}   opts.threshold - breach level
+ * @param {string}   opts.severity  - P1 | P2 | P3 | P4
+ * @param {string}   opts.message   - human-readable description
  */
-async function checkThreshold({
-  agentId,
-  metric,
-  value,
-  threshold,
-  severity,
-  message,
-}) {
+async function checkThreshold({ agentId, type, value, threshold, severity, message }) {
   if (!agentId) return;
 
-  // 🔴 Threshold breached
   if (value >= threshold) {
-    const existing = await Alert.findOne({
-      agentId,
-      type: metric,
-      resolvedAt: null,
-    });
-
+    // Already have an open alert — skip duplicate
+    const existing = await Alert.findOne({ agentId, type, resolvedAt: null });
     if (!existing) {
-      const alert = await Alert.create({
-        agentId,                // ✅ REQUIRED
-        type: metric,
-        severity,
-        message,
-      });
-
+      const alert = await Alert.create({ agentId, type, severity, message });
       await attachAlertToIncident(alert);
     }
-
     return;
   }
 
-  //  Threshold recovered
-  const openAlerts = await Alert.find({
-    agentId,
-    type: metric,
-    resolvedAt: null,
-  });
-
+  // Metric recovered — resolve open alerts
+  const openAlerts = await Alert.find({ agentId, type, resolvedAt: null });
   for (const alert of openAlerts) {
     alert.resolvedAt = new Date();
     await alert.save();
@@ -54,6 +39,4 @@ async function checkThreshold({
   }
 }
 
-module.exports = {
-  checkThreshold,
-};
+module.exports = { checkThreshold };

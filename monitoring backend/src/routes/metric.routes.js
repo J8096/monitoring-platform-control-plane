@@ -1,6 +1,6 @@
 const express = require("express");
 const mongoose = require("mongoose");
-const Metric = require("../models/metric1");
+const Metric = require("../models/Metric");
 const auth = require("../middleware/requireAuth");
 
 const router = express.Router();

@@ -28,7 +28,7 @@ export default function Dashboard() {
   const loadAlerts = async () => {
     try {
       const res = await api.get("/alerts?limit=50");
-      setAlerts(Array.isArray(res.data) ? res.data : []);
+      const d = res.data; setAlerts(Array.isArray(d) ? d : Array.isArray(d?.data) ? d.data : []);
     } catch (err) { console.error("Failed to load alerts", err); }
     finally { setAlertsLoading(false); }
   };
